@@ -72,9 +72,6 @@
 		data() {
 			return {
 				isDarkTheme: false,
-				// sleepDuration: '8:00',
-				// sleepStartTime: '22:00',
-				// sleepEndTime: '06:00',
 				currentTime: '',
 				charts: {},
 				chartData: {
@@ -97,7 +94,8 @@
 				},
 				timer: null,
 				totalHours: 24,
-				displayHours: 8
+				displayHours: 8,
+				startTimeIndex: 0
 			}
 		},
 		onLoad() {
@@ -152,6 +150,21 @@
 								color: textColor
 							}
 						},
+						dataZoom: [{
+							type: 'inside',
+							start: 0,
+							end: (this.displayHours * 4) / (this.totalHours * 4) * 100,
+							zoomOnMouseWheel: false,
+							moveOnMouseMove: true,
+							moveOnMouseWheel: false,
+							preventDefaultMouseMove: true,
+							throttle: 0,
+							rangeMode: ['value', 'value'],
+							filterMode: 'filter',
+							zoomLock: true,
+							minSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100,
+							maxSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100
+						}],
 						xAxis: {
 							axisLine: {
 								lineStyle: {
@@ -217,29 +230,30 @@
 					);
 				};
 				
-				// 生成24小时的时间点
-				const timePoints = Array.from({length: this.totalHours}, (_, i) => {
-					const hour = (i + 24 - this.totalHours + 24) % 24;
-					return `${String(hour).padStart(2, '0')}:00`;
+				// 生成24小时的时间点，每15分钟一个数据点
+				const timePoints = Array.from({length: this.totalHours * 4}, (_, i) => {
+					const hour = Math.floor(i / 4);
+					const minute = (i % 4) * 15;
+					return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 				});
 				
 				// 生成所有数据
 				this.chartData = {
 					heartRate: {
 						times: timePoints,
-						values: generateData(75, 10, this.totalHours)
+						values: generateData(75, 10, this.totalHours * 4)
 					},
 					breathingRate: {
 						times: timePoints,
-						values: generateData(16, 4, this.totalHours)
+						values: generateData(16, 4, this.totalHours * 4)
 					},
 					temperature: {
 						times: timePoints,
-						values: generateData(36.5, 0.5, this.totalHours)
+						values: generateData(36.5, 0.5, this.totalHours * 4)
 					},
 					snore: {
 						times: timePoints,
-						values: generateData(30, 15, this.totalHours)
+						values: generateData(30, 15, this.totalHours * 4)
 					}
 				};
 			},
@@ -253,6 +267,21 @@
 						left: 5,
 						containLabel: true
 					},
+					dataZoom: [{
+						type: 'inside',
+						start: 0,
+						end: (this.displayHours * 4) / (this.totalHours * 4) * 100,
+						zoomOnMouseWheel: false,
+						moveOnMouseMove: true,
+						moveOnMouseWheel: false,
+						preventDefaultMouseMove: true,
+						throttle: 0,
+						rangeMode: ['value', 'value'],
+						filterMode: 'filter',
+						zoomLock: true,
+						minSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100,
+						maxSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100
+					}],
 					tooltip: {
 						trigger: 'axis',
 						axisPointer: {
@@ -360,7 +389,16 @@
 							width: 2,
 							shadowColor: 'rgba(0,0,0,0.1)',
 							shadowBlur: 4
-						}
+						},
+						emphasis: {
+							focus: 'series',
+							itemStyle: {
+								borderWidth: 2
+							}
+						},
+						animation: false,
+						zlevel: 1,
+						z: 1
 					}]
 				};
 				
