@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
 	<view class="content">
 		<view class="header">
 			<text class="title">睡眠监测数据</text>
@@ -34,6 +34,10 @@
 			</view>
 		</view>
 		
+		<view class="recorder-section">
+			<audio-recorder @recording-complete="handleRecordingComplete" />
+		</view>
+		
 		<view class="nav-button" @click="goToConsult">
 			<text>睡眠咨询</text>
 		</view>
@@ -42,8 +46,12 @@
 
 <script>
 	import * as echarts from 'echarts';
+	import AudioRecorder from '@/components/audio-recorder/audio-recorder.vue';
 	
 	export default {
+		components: {
+			AudioRecorder
+		},
 		data() {
 			return {
 				charts: {},
@@ -64,7 +72,8 @@
 						times: [],
 						values: []
 					}
-				}
+				},
+				lastRecording: null
 			}
 		},
 		onLoad() {
@@ -256,6 +265,14 @@
 				uni.navigateTo({
 					url: '/pages/consult/consult'
 				});
+			},
+			
+			handleRecordingComplete(recording) {
+				console.log('录音完成:', recording);
+				this.lastRecording = recording;
+				
+				// 这里可以添加录音完成后的处理逻辑
+				// 例如：上传到服务器、分析音频等
 			}
 		},
 		onUnload() {
@@ -271,42 +288,57 @@
 
 <style>
 	.content {
-		padding: 20rpx;
+		padding: 30rpx;
+		min-height: 100vh;
+		background-color: #f8f8f8;
+		box-sizing: border-box;
+		padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
 	}
 	
 	.header {
 		text-align: center;
-		padding: 20rpx 0;
+		padding: 30rpx 0;
+		margin-bottom: 20rpx;
 	}
 	
 	.title {
-		font-size: 36rpx;
+		font-size: 40rpx;
 		font-weight: bold;
 		color: #333;
+		text-shadow: 0 2rpx 4rpx rgba(0,0,0,0.1);
 	}
 	
 	.charts-container {
 		display: flex;
 		flex-direction: column;
-		gap: 30rpx;
+		gap: 40rpx;
+		margin-bottom: 40rpx;
 	}
 	
 	.chart-item {
 		background-color: #fff;
-		border-radius: 12rpx;
-		padding: 20rpx;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+		border-radius: 20rpx;
+		padding: 30rpx;
+		box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
+		transition: transform 0.3s ease;
+	}
+	
+	.chart-item:active {
+		transform: scale(0.98);
 	}
 	
 	.chart-title {
-		font-size: 28rpx;
-		color: #666;
-		margin-bottom: 20rpx;
+		font-size: 32rpx;
+		color: #333;
+		margin-bottom: 30rpx;
+		font-weight: 500;
 	}
 	
 	.chart-box {
 		width: 100%;
-		height: 400rpx;
+		height: 50vw;
+		max-height: 500rpx;
+		min-height: 400rpx;
 	}
 	
 	.echarts {
@@ -314,16 +346,49 @@
 		height: 100%;
 	}
 	
+	.recorder-section {
+		margin: 40rpx 0;
+		padding: 0 20rpx;
+		margin-bottom: calc(40rpx + env(safe-area-inset-bottom));
+	}
+	
 	.nav-button {
 		position: fixed;
-		bottom: 40rpx;
+		bottom: calc(40rpx + env(safe-area-inset-bottom));
 		left: 50%;
 		transform: translateX(-50%);
-		background-color: #007AFF;
+		background: linear-gradient(135deg, #007AFF, #0056b3);
 		color: #fff;
-		padding: 20rpx 60rpx;
-		border-radius: 40rpx;
-		font-size: 32rpx;
-		box-shadow: 0 4rpx 12rpx rgba(0,122,255,0.3);
+		padding: 24rpx 80rpx;
+		border-radius: 50rpx;
+		font-size: 34rpx;
+		font-weight: 500;
+		box-shadow: 0 6rpx 20rpx rgba(0,122,255,0.3);
+		transition: all 0.3s ease;
+		-webkit-tap-highlight-color: transparent;
 	}
-</style>
+	
+	.nav-button:active {
+		transform: translateX(-50%) scale(0.95);
+		box-shadow: 0 4rpx 12rpx rgba(0,122,255,0.2);
+	}
+	
+	@media (prefers-color-scheme: dark) {
+		.content {
+			background-color: #1a1a1a;
+		}
+		
+		.title {
+			color: #fff;
+		}
+		
+		.chart-item {
+			background-color: #2c2c2c;
+			box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.2);
+		}
+		
+		.chart-title {
+			color: #fff;
+		}
+	}
+</style> -->
