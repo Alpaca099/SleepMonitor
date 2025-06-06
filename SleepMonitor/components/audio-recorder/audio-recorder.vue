@@ -26,7 +26,7 @@
 				</view>
 				
 				<view class="recorder-info" v-if="isRecording">
-					<text class="time-display">{{ formatTime(recordingTime) }}</text>
+					<text class="time-display">{{ formatTime(recordingDuration) }}</text>
 					<text class="size-display">{{ formatFileSize(currentSize) }}</text>
 				</view>
 			</view>
@@ -58,6 +58,7 @@
 				maxDuration: 5 * 60 * 1000, // 最大录音时长5分钟
 				mediaRecorder: null, // H5环境下的MediaRecorder实例
 				recorderManager: null, // 录音管理器实例
+				currentSize: 0, // 当前录音文件大小
 				options: {
 					duration: 300000, // 最长录音时间，单位ms
 					sampleRate: 44100, // 采样率
@@ -82,13 +83,14 @@
 				console.log('录音结束:', res);
 				this.isRecording = false;
 				this.recordingDuration = 0;
+				this.currentSize = 0;
 				clearInterval(this.durationTimer);
 				
 				// 保存录音信息
 				this.lastRecording = {
 					tempFilePath: res.tempFilePath,
-					duration: res.duration,
-					size: res.fileSize,
+					duration: res.duration || this.recordingDuration,
+					size: res.fileSize || this.currentSize,
 					timestamp: new Date().getTime()
 				};
 				
@@ -108,7 +110,17 @@
 				});
 				this.isRecording = false;
 				this.recordingDuration = 0;
+				this.currentSize = 0;
 				clearInterval(this.durationTimer);
+			});
+
+			// 监听录音帧数据
+			this.recorderManager.onFrameRecorded((res) => {
+				const { frameBuffer, isLastFrame } = res;
+				if (frameBuffer && frameBuffer.length > 0) {
+					// 计算文件大小（估算）
+					this.currentSize = Math.floor(this.recordingDuration / 1000 * this.options.encodeBitRate / 8);
+				}
 			});
 		},
 		methods: {
@@ -287,17 +299,28 @@
 				// #endif
 				
 				this.isRecording = true;
+				this.startTime = Date.now();
 				this.recordingDuration = 0;
+				this.currentSize = 0;
+				
+				console.log('开始录音，时间戳:', this.startTime);
 				
 				// 开始计时
 				this.durationTimer = setInterval(() => {
-					this.recordingDuration += 1000;
+					const now = Date.now();
+					const duration = now - this.startTime;
+					console.log('当前时间:', now, '开始时间:', this.startTime, '时长:', duration);
+					
+					this.recordingDuration = duration;
+					
+					// 估算文件大小
+					this.currentSize = Math.floor(duration / 1000 * this.options.encodeBitRate / 8);
 					
 					// 检查是否达到最大录音时长
-					if (this.recordingDuration >= this.maxDuration) {
+					if (duration >= this.maxDuration) {
 						this.recorderManager.stop();
 					}
-				}, 1000);
+				}, 100);
 			},
 			
 			async saveRecordingFile(tempFilePath) {
@@ -351,11 +374,34 @@
 			},
 			
 			formatTime(ms) {
+				//console.log('格式化时间，输入值:', ms, '类型:', typeof ms);
+				
+				// 确保ms是有效的数字
+				if (typeof ms !== 'number' || isNaN(ms)) {
+					//console.log('无效的时间值，返回00:00');
+					return '00:00';
+				}
+				
+				// 确保ms是整数
+				ms = Math.floor(ms);
+				
 				const totalSeconds = Math.floor(ms / 1000);
 				const minutes = Math.floor(totalSeconds / 60);
 				const seconds = totalSeconds % 60;
-				return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+				
+				//console.log('计算得到 - 总秒数:', totalSeconds, '分钟:', minutes, '秒:', seconds);
+				
+				// 确保分钟和秒数都是有效的数字
+				if (isNaN(minutes) || isNaN(seconds)) {
+					//console.log('计算后的分钟或秒数无效，返回00:00');
+					return '00:00';
+				}
+				
+				const result = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+				console.log('格式化结果:', result);
+				return result;
 			},
+
 			
 			formatFileSize(bytes) {
 				if (bytes < 1024) {

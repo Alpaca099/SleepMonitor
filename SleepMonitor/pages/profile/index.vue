@@ -3,7 +3,7 @@
 		<view class="page-header">
 			<text class="page-title">个人中心</text>
 			<view class="theme-switch" @tap="toggleTheme">
-				<text class="theme-icon">{{ isDarkTheme ? '☀️' : '🌙' }}</text>
+				<text class="theme-icon">{{ isDarkTheme ? '🌞' : '🌙' }}</text>
 			</view>
 		</view>
 		
@@ -76,8 +76,7 @@
 	.profile-container {
 		min-height: 100vh;
 		background-color: #f5f5f5;
-		padding: 20rpx;
-		box-sizing: border-box;
+		transition: background-color 0.3s ease;
 	}
 	
 	.dark-theme {
@@ -88,8 +87,14 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 20rpx 0;
-		margin-bottom: 30rpx;
+		padding: 20rpx 30rpx;
+		background-color: #ffffff;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+	}
+	
+	.dark-theme .page-header {
+		background-color: #2c2c2c;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
 	}
 	
 	.page-title {
@@ -99,7 +104,7 @@
 	}
 	
 	.dark-theme .page-title {
-		color: #fff;
+		color: #ffffff;
 	}
 	
 	.theme-switch {
@@ -108,14 +113,14 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: #fff;
+		background-color: #f5f5f5;
 		border-radius: 50%;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+		cursor: pointer;
+		transition: background-color 0.3s ease;
 	}
 	
 	.dark-theme .theme-switch {
-		background-color: #2c2c2c;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
+		background-color: #3a3a3a;
 	}
 	
 	.theme-icon {
@@ -125,7 +130,7 @@
 	.profile-content {
 		display: flex;
 		flex-direction: column;
-		gap: 30rpx;
+		margin-bottom: 30rpx;
 	}
 	
 	.profile-card {
@@ -143,7 +148,7 @@
 	.avatar-section {
 		display: flex;
 		align-items: center;
-		gap: 20rpx;
+		margin-bottom: 20rpx;
 	}
 	
 	.avatar {
@@ -156,7 +161,7 @@
 	.user-info {
 		display: flex;
 		flex-direction: column;
-		gap: 8rpx;
+		margin-bottom: 8rpx;
 	}
 	
 	.username {
@@ -181,7 +186,7 @@
 	.settings-list {
 		display: flex;
 		flex-direction: column;
-		gap: 20rpx;
+		margin-bottom: 20rpx;
 	}
 	
 	.settings-group {

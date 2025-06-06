@@ -1,7 +1,7 @@
 <template>
 	<view class="recorder-page" :class="{ 'dark-theme': isDarkTheme }">
 		<view class="page-header">
-			<text class="page-title">录音</text>
+			<text class="page-title">睡眠信息</text>
 			<view class="theme-switch" @tap="toggleTheme">
 				<text class="theme-icon">{{ isDarkTheme ? '🌞' : '🌙' }}</text>
 			</view>
@@ -48,16 +48,6 @@
 									<text class="detail-value">{{ formatRecordingInfo(recording).snoreInfo }}</text>
 								</view>
 							</view>
-						</view>
-						<view class="recording-actions">
-							<button 
-								class="action-btn play-btn"
-								@tap="playRecording(recording)"
-							>播放</button>
-							<button 
-								class="action-btn delete-btn"
-								@tap="deleteRecording(index)"
-							>删除</button>
 						</view>
 					</view>
 				</view>
@@ -142,6 +132,10 @@
 			}
 		},
 		onLoad() {
+			// 从本地存储读取主题设置
+			const theme = uni.getStorageSync('theme');
+			this.isDarkTheme = theme === 'dark';
+			
 			// 初始化音频上下文
 			this.audioContext = uni.createInnerAudioContext();
 			// 加载历史录音
@@ -306,8 +300,7 @@
 	.recorder-page {
 		min-height: 100vh;
 		background-color: #f5f5f5;
-		padding: 20rpx;
-		box-sizing: border-box;
+		transition: background-color 0.3s ease;
 	}
 	
 	.dark-theme {
@@ -318,8 +311,14 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 20rpx 0;
-		margin-bottom: 30rpx;
+		padding: 20rpx 30rpx;
+		background-color: #ffffff;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+	}
+	
+	.dark-theme .page-header {
+		background-color: #2c2c2c;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
 	}
 	
 	.page-title {
@@ -329,7 +328,7 @@
 	}
 	
 	.dark-theme .page-title {
-		color: #fff;
+		color: #ffffff;
 	}
 	
 	.theme-switch {
@@ -338,14 +337,14 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: #fff;
+		background-color: #f5f5f5;
 		border-radius: 50%;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+		cursor: pointer;
+		transition: background-color 0.3s ease;
 	}
 	
 	.dark-theme .theme-switch {
-		background-color: #2c2c2c;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
+		background-color: #3a3a3a;
 	}
 	
 	.theme-icon {
@@ -355,7 +354,7 @@
 	.page-content {
 		display: flex;
 		flex-direction: column;
-		gap: 30rpx;
+		margin-bottom: 30rpx;
 	}
 	
 	.recorder-section {
@@ -411,25 +410,24 @@
 	.recording-list {
 		display: flex;
 		flex-direction: column;
-		gap: 20rpx;
+		margin-bottom: 20rpx;
 	}
 	
 	.recording-item {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		padding: 24rpx;
-		background-color: #f8f8f8;
-		border-radius: 16rpx;
+		background-color: #ffffff;
+		border-radius: 20rpx;
+		padding: 20rpx;
+		margin-bottom: 20rpx;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
 	}
 	
 	.dark-theme .recording-item {
-		background-color: #333;
+		background-color: #2c2c2c;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
 	}
 	
 	.recording-info {
 		flex: 1;
-		margin-right: 20rpx;
 	}
 	
 	.recording-header {
@@ -438,83 +436,42 @@
 	
 	.recording-date {
 		font-size: 28rpx;
-		color: #666;
-		font-weight: 500;
+		color: #333;
+		font-weight: bold;
 	}
 	
 	.dark-theme .recording-date {
-		color: #999;
+		color: #ffffff;
 	}
 	
 	.recording-details {
 		display: flex;
 		flex-direction: column;
-		gap: 12rpx;
+		margin-bottom: 12rpx;
 	}
 	
 	.detail-item {
 		display: flex;
 		align-items: center;
-		gap: 16rpx;
+		margin-bottom: 16rpx;
 	}
 	
 	.detail-label {
-		font-size: 26rpx;
-		color: #999;
-		min-width: 120rpx;
+		font-size: 24rpx;
+		color: #666;
 	}
 	
 	.dark-theme .detail-label {
-		color: #666;
-	}
-	
-	.detail-value {
-		font-size: 26rpx;
-		color: #333;
-		font-weight: 500;
-	}
-	
-	.dark-theme .detail-value {
-		color: #fff;
-	}
-	
-	.recording-actions {
-		display: flex;
-		flex-direction: column;
-		gap: 12rpx;
-	}
-	
-	.action-btn {
-		padding: 12rpx 24rpx;
-		font-size: 26rpx;
-		border-radius: 8rpx;
-		border: none;
-		background-color: #f0f0f0;
-		color: #666;
-		line-height: 1.4;
-	}
-	
-	.dark-theme .action-btn {
-		background-color: #444;
 		color: #999;
 	}
 	
-	.play-btn {
-		background-color: #91cc75;
-		color: #fff;
+	.detail-value {
+		font-size: 24rpx;
+		color: #333;
 	}
 	
-	.dark-theme .play-btn {
-		background-color: #7ab55c;
-	}
-	
-	.delete-btn {
-		background-color: #ee6666;
-		color: #fff;
-	}
-	
-	.dark-theme .delete-btn {
-		background-color: #d45555;
+	.dark-theme .detail-value {
+		color: #ffffff;
 	}
 	
 	.empty-state {

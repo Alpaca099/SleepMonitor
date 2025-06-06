@@ -118,6 +118,12 @@
           "selectedIconPath": "/static/tabbar/sleep-active.png"
         },
         {
+          "pagePath": "pages/recorder/index",
+          "text": "睡眠录音",
+          "iconPath": "/static/tabbar/recorder.png",
+          "selectedIconPath": "/static/tabbar/recorder-active.png"
+        },
+        {
           "pagePath": "pages/consult/consult",
           "text": "睡眠咨询",
           "iconPath": "/static/tabbar/consult.png",

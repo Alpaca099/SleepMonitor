@@ -61,7 +61,7 @@
 			},
 			{
 				"pagePath": "pages/profile/index",
-				"text": "我的",
+				"text": "我的我的",
 				"iconPath": "static/tabbar/profile.png",
 				"selectedIconPath": "static/tabbar/profile-active.png"
 			}

@@ -1,5 +1,11 @@
 <template>
-	<view class="consult-container">
+	<view class="consult-container":class="{ 'dark-theme': isDarkTheme }">
+		<view class="page-header">
+			<text class="page-title">睡眠咨询</text>
+			<view class="theme-switch" @tap="toggleTheme">
+				<text class="theme-icon">{{ isDarkTheme ? '🌞' : '🌙' }}</text>
+			</view>
+		</view>
 		<view class="chat-container">
 			<scroll-view class="chat-scroll" scroll-y="true" :scroll-top="scrollTop" @scrolltoupper="loadMoreMessages">
 				<view class="message-list">
@@ -51,6 +57,7 @@
 				inputMessage: '',
 				isLoading: false,
 				scrollTop: 0,
+				isDarkTheme: false,
 				systemPrompt: `你是一个专业的睡眠顾问，具有丰富的睡眠医学知识。你的主要职责是：
 1. 解答用户关于睡眠的问题
 2. 提供改善睡眠质量的建议
@@ -66,6 +73,10 @@
 			}
 		},
 		onLoad() {
+			// 从本地存储中读取主题设置
+			const savedTheme = uni.getStorageSync('theme');
+			this.isDarkTheme = savedTheme === 'dark';
+			
 			// 添加欢迎消息
 			this.messages.push({
 				role: 'assistant',
@@ -191,6 +202,11 @@
 			loadMoreMessages() {
 				// 实现加载更多历史消息的逻辑
 				console.log('加载更多消息');
+			},
+
+			toggleTheme() {
+				this.isDarkTheme = !this.isDarkTheme;
+				uni.setStorageSync('theme', this.isDarkTheme ? 'dark' : 'light');
 			}
 		}
 	}
@@ -202,6 +218,106 @@
 		flex-direction: column;
 		height: 100vh;
 		background-color: #f5f5f5;
+		transition: background-color 0.3s ease;
+	}
+	
+	.page-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 20rpx 30rpx;
+		background-color: #ffffff;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+	}
+	
+	.page-title {
+		font-size: 36rpx;
+		font-weight: bold;
+		color: #333;
+	}
+	
+	.theme-switch {
+		width: 80rpx;
+		height: 80rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background-color: #f5f5f5;
+		border-radius: 50%;
+		cursor: pointer;
+		transition: background-color 0.3s ease;
+	}
+	
+	.theme-icon {
+		font-size: 40rpx;
+	}
+	
+	/* 深色模式样式 */
+	.consult-container.dark-theme {
+		background-color: #1a1a1a;
+	}
+	
+	.dark-theme .page-header {
+		background-color: #2c2c2c;
+	}
+	
+	.dark-theme .page-title {
+		color: #ffffff;
+	}
+	
+	.dark-theme .theme-switch {
+		background-color: #3a3a3a;
+	}
+	
+	.dark-theme .message-time {
+		color: #888;
+	}
+	
+	.dark-theme .user-message .message-content {
+		background-color: #0A84FF;
+		color: #ffffff;
+	}
+	
+	.dark-theme .ai-message .message-content {
+		background-color: #2c2c2c;
+		color: #ffffff;
+		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
+	}
+	
+	.dark-theme .input-container {
+		background-color: #2c2c2c;
+		border-top: 1rpx solid #3a3a3a;
+	}
+	
+	.dark-theme .message-input {
+		background-color: #3a3a3a;
+		color: #ffffff;
+	}
+	
+	.dark-theme .message-input::placeholder {
+		color: #888;
+	}
+	
+	.dark-theme .send-button {
+		background-color: #0A84FF;
+	}
+	
+	.dark-theme .send-button[disabled] {
+		background-color: #4a4a4a;
+	}
+	
+	.dark-theme .loading-content {
+		background-color: #2c2c2c !important;
+	}
+	
+	.dark-theme .typing-indicator .dot {
+		background-color: #888;
+	}
+	
+	.dark-theme .typing-indicator .dot:nth-child(1),
+	.dark-theme .typing-indicator .dot:nth-child(2),
+	.dark-theme .typing-indicator .dot:nth-child(3) {
+		background-color: #0A84FF;
 	}
 	
 	.chat-container {
@@ -269,7 +385,7 @@
 		border-top: 1rpx solid #eee;
 		display: flex;
 		align-items: center;
-		gap: 20rpx;
+		margin-bottom: 20rpx;
 	}
 	
 	.message-input {
@@ -329,7 +445,7 @@
 	.typing-indicator {
 		display: flex;
 		align-items: center;
-		gap: 8rpx;
+		margin-bottom: 8rpx;
 		padding: 16rpx 24rpx;
 	}
 	
@@ -368,4 +484,5 @@
 			opacity: 1;
 		}
 	}
+	
 </style> 

@@ -41,265 +41,6 @@ if (uni.restoreGlobal) {
   function resolveEasycom(component, easycom) {
     return typeof component === "string" ? easycom : component;
   }
-  const _export_sfc = (sfc, props) => {
-    const target = sfc.__vccOpts || sfc;
-    for (const [key, val] of props) {
-      target[key] = val;
-    }
-    return target;
-  };
-  const recorderManager = uni.getRecorderManager();
-  const _sfc_main$4 = {
-    name: "AudioRecorder",
-    data() {
-      return {
-        isRecording: false,
-        recordingDuration: 0,
-        durationTimer: null,
-        lastRecording: null,
-        maxDuration: 5 * 60 * 1e3,
-        // 最大录音时长5分钟
-        options: {
-          duration: 3e5,
-          // 最长录音时间，单位ms
-          sampleRate: 44100,
-          // 采样率
-          numberOfChannels: 1,
-          // 录音通道数
-          encodeBitRate: 192e3,
-          // 编码码率
-          format: "mp3",
-          // 音频格式
-          frameSize: 50
-          // 指定帧大小
-        }
-      };
-    },
-    created() {
-      recorderManager.onStop((res) => {
-        formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:68", "录音结束:", res);
-        this.isRecording = false;
-        this.recordingDuration = 0;
-        clearInterval(this.durationTimer);
-        this.lastRecording = {
-          tempFilePath: res.tempFilePath,
-          duration: res.duration,
-          size: res.fileSize,
-          timestamp: (/* @__PURE__ */ new Date()).getTime()
-        };
-        this.saveRecordingFile(res.tempFilePath);
-        this.$emit("recording-complete", this.lastRecording);
-      });
-      recorderManager.onError((res) => {
-        formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:90", "录音错误:", res);
-        uni.showToast({
-          title: "录音出错: " + res.errMsg,
-          icon: "none"
-        });
-        this.isRecording = false;
-        this.recordingDuration = 0;
-        clearInterval(this.durationTimer);
-      });
-    },
-    methods: {
-      async toggleRecording() {
-        if (this.isRecording) {
-          recorderManager.stop();
-        } else {
-          try {
-            const auth = await this.checkPermission();
-            if (auth) {
-              this.startRecording();
-            }
-          } catch (error2) {
-            formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:113", "权限检查失败:", error2);
-            uni.showToast({
-              title: "无法获取录音权限",
-              icon: "none"
-            });
-          }
-        }
-      },
-      async checkPermission() {
-        return new Promise((resolve, reject) => {
-          const permission = "android.permission.RECORD_AUDIO";
-          plus.android.requestPermissions(
-            [permission],
-            function(resultObj) {
-              if (resultObj.granted.length === 1) {
-                resolve(true);
-              } else {
-                uni.showModal({
-                  title: "提示",
-                  content: "需要录音权限才能使用此功能",
-                  confirmText: "去设置",
-                  success: (res) => {
-                    if (res.confirm) {
-                      plus.runtime.openURL("app-settings:");
-                    }
-                    resolve(false);
-                  }
-                });
-              }
-            },
-            function(error2) {
-              formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:147", "申请权限错误:", error2);
-              reject(error2);
-            }
-          );
-        });
-      },
-      startRecording() {
-        recorderManager.start(this.options);
-        this.isRecording = true;
-        this.recordingDuration = 0;
-        this.durationTimer = setInterval(() => {
-          this.recordingDuration += 1e3;
-          if (this.recordingDuration >= this.maxDuration) {
-            recorderManager.stop();
-          }
-        }, 1e3);
-      },
-      async saveRecordingFile(tempFilePath) {
-        try {
-          const fileName = `sleep_recording_${(/* @__PURE__ */ new Date()).getTime()}.mp3`;
-          const savePath = plus.io.convertLocalFileSystemURL(`_doc/${fileName}`);
-          await new Promise((resolve, reject) => {
-            plus.io.resolveLocalFileSystemURL(tempFilePath, (entry) => {
-              entry.copyTo(
-                plus.io.convertLocalFileSystemURL("_doc"),
-                fileName,
-                () => {
-                  formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:190", "录音文件保存成功:", savePath);
-                  this.lastRecording.savedPath = savePath;
-                  resolve();
-                },
-                (error2) => {
-                  formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:195", "保存录音文件失败:", error2);
-                  reject(error2);
-                }
-              );
-            });
-          });
-          uni.showToast({
-            title: "录音已保存",
-            icon: "success"
-          });
-        } catch (error2) {
-          formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:213", "保存录音文件失败:", error2);
-          uni.showToast({
-            title: "保存录音失败",
-            icon: "none"
-          });
-        }
-      },
-      formatTime(ms) {
-        const totalSeconds = Math.floor(ms / 1e3);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-      },
-      formatFileSize(bytes) {
-        if (bytes < 1024) {
-          return bytes + "B";
-        } else if (bytes < 1024 * 1024) {
-          return (bytes / 1024).toFixed(2) + "KB";
-        } else {
-          return (bytes / (1024 * 1024)).toFixed(2) + "MB";
-        }
-      },
-      formatDate(timestamp) {
-        const date = new Date(timestamp);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-      }
-    },
-    beforeDestroy() {
-      if (this.durationTimer) {
-        clearInterval(this.durationTimer);
-      }
-    }
-  };
-  function _sfc_render$3(_ctx, _cache, $props, $setup, $data, $options) {
-    return vue.openBlock(), vue.createElementBlock("view", { class: "recorder-container" }, [
-      vue.createElementVNode("view", { class: "recorder-card" }, [
-        vue.createElementVNode("view", { class: "recorder-header" }, [
-          vue.createElementVNode("text", { class: "recorder-title" }, "睡眠录音"),
-          vue.createElementVNode("text", { class: "recorder-subtitle" }, "记录睡眠时的声音")
-        ]),
-        vue.createElementVNode("view", { class: "recorder-controls" }, [
-          vue.createElementVNode("view", { class: "recorder-status" }, [
-            vue.createElementVNode(
-              "view",
-              {
-                class: vue.normalizeClass(["status-indicator", { "recording": $data.isRecording }])
-              },
-              [
-                vue.createElementVNode("view", { class: "status-dot" })
-              ],
-              2
-              /* CLASS */
-            ),
-            vue.createElementVNode(
-              "text",
-              { class: "status-text" },
-              vue.toDisplayString($data.isRecording ? "正在录音" : "未开始录音"),
-              1
-              /* TEXT */
-            )
-          ]),
-          vue.createElementVNode(
-            "view",
-            {
-              class: vue.normalizeClass(["recorder-button", { "recording": $data.isRecording }]),
-              onClick: _cache[0] || (_cache[0] = (...args) => $options.toggleRecording && $options.toggleRecording(...args))
-            },
-            [
-              vue.createElementVNode("view", { class: "button-inner" }, [
-                vue.createElementVNode(
-                  "view",
-                  {
-                    class: vue.normalizeClass(["button-icon", { "recording": $data.isRecording }])
-                  },
-                  [
-                    vue.createElementVNode("view", { class: "icon-circle" })
-                  ],
-                  2
-                  /* CLASS */
-                )
-              ])
-            ],
-            2
-            /* CLASS */
-          ),
-          $data.isRecording ? (vue.openBlock(), vue.createElementBlock("view", {
-            key: 0,
-            class: "recorder-info"
-          }, [
-            vue.createElementVNode(
-              "text",
-              { class: "time-display" },
-              vue.toDisplayString($options.formatTime(_ctx.recordingTime)),
-              1
-              /* TEXT */
-            ),
-            vue.createElementVNode(
-              "text",
-              { class: "size-display" },
-              vue.toDisplayString($options.formatFileSize(_ctx.currentSize)),
-              1
-              /* TEXT */
-            )
-          ])) : vue.createCommentVNode("v-if", true)
-        ]),
-        vue.createElementVNode("view", { class: "recorder-tips" }, [
-          vue.createElementVNode("text", { class: "tip-text" }, "• 最长录音时间：5分钟"),
-          vue.createElementVNode("text", { class: "tip-text" }, "• 录音将自动保存"),
-          vue.createElementVNode("text", { class: "tip-text" }, "• 请确保麦克风权限已开启")
-        ])
-      ])
-    ]);
-  }
-  const __easycom_0 = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["render", _sfc_render$3], ["__scopeId", "data-v-aaa3e8c8"], ["__file", "E:/D/CODE/IOT_SYS/SleepMonitor/SleepMonitor/components/audio-recorder/audio-recorder.vue"]]);
   /*! *****************************************************************************
       Copyright (c) Microsoft Corporation.
   
@@ -13090,6 +12831,7 @@ if (uni.restoreGlobal) {
     }
     return LinearGradient2;
   }(Gradient$1);
+  const LinearGradient$1 = LinearGradient;
   var RadialGradient = function(_super) {
     __extends(RadialGradient2, _super);
     function RadialGradient2(x, y, r, colorStops, globalCoord) {
@@ -13777,7 +13519,7 @@ if (uni.restoreGlobal) {
     Image: ZRImage$1,
     IncrementalDisplayable: IncrementalDisplayable$1,
     Line: Line$2,
-    LinearGradient,
+    LinearGradient: LinearGradient$1,
     OrientedBoundingRect: OrientedBoundingRect$1,
     Path: Path$1,
     Point,
@@ -33084,7 +32826,7 @@ if (uni.restoreGlobal) {
       offset: inRangeStopLen ? colorStopsInRange[0].offset : 0.5,
       color: outerColors[0] || "transparent"
     });
-    var gradient = new LinearGradient(0, 0, 0, 0, colorStopsInRange, true);
+    var gradient = new LinearGradient$1(0, 0, 0, 0, colorStopsInRange, true);
     gradient[coordDim] = minCoord;
     gradient[coordDim + "2"] = maxCoord;
     return gradient;
@@ -39899,7 +39641,7 @@ if (uni.restoreGlobal) {
       var y1 = parseInt(xmlNode.getAttribute("y1") || "0", 10);
       var x2 = parseInt(xmlNode.getAttribute("x2") || "10", 10);
       var y2 = parseInt(xmlNode.getAttribute("y2") || "0", 10);
-      var gradient = new LinearGradient(x1, y1, x2, y2);
+      var gradient = new LinearGradient$1(x1, y1, x2, y2);
       parsePaintServerUnit(xmlNode, gradient);
       parseGradientColorStops(xmlNode, gradient);
       return gradient;
@@ -51017,7 +50759,7 @@ if (uni.restoreGlobal) {
         var sourceColor = edge.node1.getVisual("color");
         var targetColor = edge.node2.getVisual("color");
         if (isString(sourceColor) && isString(targetColor)) {
-          curveProps.fill = new LinearGradient(0, 0, +(orient === "horizontal"), +(orient === "vertical"), [{
+          curveProps.fill = new LinearGradient$1(0, 0, +(orient === "horizontal"), +(orient === "vertical"), [{
             color: sourceColor,
             offset: 0
           }, {
@@ -70656,7 +70398,7 @@ if (uni.restoreGlobal) {
         var symbolSizes = [this.getControllerVisual(dataInterval[0], "symbolSize", opts), this.getControllerVisual(dataInterval[1], "symbolSize", opts)];
         var barPoints = this._createBarPoints(handleEnds, symbolSizes);
         return {
-          barColor: new LinearGradient(0, 0, 0, 1, colorStops),
+          barColor: new LinearGradient$1(0, 0, 0, 1, colorStops),
           barPoints,
           handlesColor: [colorStops[0].color, colorStops[colorStops.length - 1].color]
         };
@@ -73956,28 +73698,338 @@ if (uni.restoreGlobal) {
   use(install);
   use(installUniversalTransition);
   use(installLabelLayout);
-  const _sfc_main$3 = {
+  const _export_sfc = (sfc, props) => {
+    const target = sfc.__vccOpts || sfc;
+    for (const [key, val] of props) {
+      target[key] = val;
+    }
+    return target;
+  };
+  const _sfc_main$5 = {
+    name: "AudioRecorder",
+    props: {
+      isDarkTheme: {
+        type: Boolean,
+        default: false
+      }
+    },
+    data() {
+      return {
+        isRecording: false,
+        recordingDuration: 0,
+        durationTimer: null,
+        lastRecording: null,
+        maxDuration: 5 * 60 * 1e3,
+        // 最大录音时长5分钟
+        mediaRecorder: null,
+        // H5环境下的MediaRecorder实例
+        recorderManager: null,
+        // 录音管理器实例
+        currentSize: 0,
+        // 当前录音文件大小
+        options: {
+          duration: 3e5,
+          // 最长录音时间，单位ms
+          sampleRate: 44100,
+          // 采样率
+          numberOfChannels: 1,
+          // 录音通道数
+          encodeBitRate: 192e3,
+          // 编码码率
+          format: "mp3",
+          // 音频格式
+          frameSize: 50
+          // 指定帧大小
+        }
+      };
+    },
+    created() {
+      this.initRecorderManager();
+      if (!this.recorderManager) {
+        formatAppLog("warn", "at components/audio-recorder/audio-recorder.vue:77", "当前环境不支持录音功能");
+        return;
+      }
+      this.recorderManager.onStop((res) => {
+        formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:83", "录音结束:", res);
+        this.isRecording = false;
+        this.recordingDuration = 0;
+        this.currentSize = 0;
+        clearInterval(this.durationTimer);
+        this.lastRecording = {
+          tempFilePath: res.tempFilePath,
+          duration: res.duration || this.recordingDuration,
+          size: res.fileSize || this.currentSize,
+          timestamp: (/* @__PURE__ */ new Date()).getTime()
+        };
+        this.saveRecordingFile(res.tempFilePath);
+        this.$emit("recording-complete", this.lastRecording);
+      });
+      this.recorderManager.onError((res) => {
+        formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:106", "录音错误:", res);
+        uni.showToast({
+          title: "录音出错: " + (res.errMsg || res.message || "未知错误"),
+          icon: "none"
+        });
+        this.isRecording = false;
+        this.recordingDuration = 0;
+        this.currentSize = 0;
+        clearInterval(this.durationTimer);
+      });
+      this.recorderManager.onFrameRecorded((res) => {
+        const { frameBuffer, isLastFrame } = res;
+        if (frameBuffer && frameBuffer.length > 0) {
+          this.currentSize = Math.floor(this.recordingDuration / 1e3 * this.options.encodeBitRate / 8);
+        }
+      });
+    },
+    methods: {
+      initRecorderManager() {
+        this.recorderManager = uni.getRecorderManager();
+      },
+      async toggleRecording() {
+        if (!this.recorderManager) {
+          uni.showToast({
+            title: "当前环境不支持录音功能",
+            icon: "none"
+          });
+          return;
+        }
+        if (this.isRecording) {
+          this.recorderManager.stop();
+        } else {
+          try {
+            const auth = await this.checkPermission();
+            if (auth) {
+              this.startRecording();
+            }
+          } catch (error2) {
+            formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:216", "权限检查失败:", error2);
+            uni.showToast({
+              title: "无法获取录音权限",
+              icon: "none"
+            });
+          }
+        }
+      },
+      async checkPermission() {
+        return new Promise((resolve, reject) => {
+          const permission = "android.permission.RECORD_AUDIO";
+          plus.android.requestPermissions(
+            [permission],
+            function(resultObj) {
+              if (resultObj.granted.length === 1) {
+                resolve(true);
+              } else {
+                uni.showModal({
+                  title: "提示",
+                  content: "需要录音权限才能使用此功能",
+                  confirmText: "去设置",
+                  success: (res) => {
+                    if (res.confirm) {
+                      plus.runtime.openURL("app-settings:");
+                    }
+                    resolve(false);
+                  }
+                });
+              }
+            },
+            function(error2) {
+              formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:250", "申请权限错误:", error2);
+              reject(error2);
+            }
+          );
+        });
+      },
+      startRecording() {
+        this.recorderManager.start(this.options);
+        this.isRecording = true;
+        this.startTime = Date.now();
+        this.recordingDuration = 0;
+        this.currentSize = 0;
+        formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:306", "开始录音，时间戳:", this.startTime);
+        this.durationTimer = setInterval(() => {
+          const now = Date.now();
+          const duration = now - this.startTime;
+          formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:312", "当前时间:", now, "开始时间:", this.startTime, "时长:", duration);
+          this.recordingDuration = duration;
+          this.currentSize = Math.floor(duration / 1e3 * this.options.encodeBitRate / 8);
+          if (duration >= this.maxDuration) {
+            this.recorderManager.stop();
+          }
+        }, 100);
+      },
+      async saveRecordingFile(tempFilePath) {
+        try {
+          const fileName = `sleep_recording_${(/* @__PURE__ */ new Date()).getTime()}.mp3`;
+          const savePath = plus.io.convertLocalFileSystemURL(`_doc/${fileName}`);
+          await new Promise((resolve, reject) => {
+            plus.io.resolveLocalFileSystemURL(tempFilePath, (entry) => {
+              entry.copyTo(
+                plus.io.convertLocalFileSystemURL("_doc"),
+                fileName,
+                () => {
+                  formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:340", "录音文件保存成功:", savePath);
+                  this.lastRecording.savedPath = savePath;
+                  resolve();
+                },
+                (error2) => {
+                  formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:345", "保存录音文件失败:", error2);
+                  reject(error2);
+                }
+              );
+            });
+          });
+          uni.showToast({
+            title: "录音已保存",
+            icon: "success"
+          });
+        } catch (error2) {
+          formatAppLog("error", "at components/audio-recorder/audio-recorder.vue:368", "保存录音文件失败:", error2);
+          uni.showToast({
+            title: "保存录音失败",
+            icon: "none"
+          });
+        }
+      },
+      formatTime(ms) {
+        if (typeof ms !== "number" || isNaN(ms)) {
+          return "00:00";
+        }
+        ms = Math.floor(ms);
+        const totalSeconds = Math.floor(ms / 1e3);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        if (isNaN(minutes) || isNaN(seconds)) {
+          return "00:00";
+        }
+        const result = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        formatAppLog("log", "at components/audio-recorder/audio-recorder.vue:401", "格式化结果:", result);
+        return result;
+      },
+      formatFileSize(bytes) {
+        if (bytes < 1024) {
+          return bytes + "B";
+        } else if (bytes < 1024 * 1024) {
+          return (bytes / 1024).toFixed(2) + "KB";
+        } else {
+          return (bytes / (1024 * 1024)).toFixed(2) + "MB";
+        }
+      },
+      formatDate(timestamp) {
+        const date = new Date(timestamp);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+      }
+    },
+    beforeDestroy() {
+      if (this.durationTimer) {
+        clearInterval(this.durationTimer);
+      }
+    }
+  };
+  function _sfc_render$4(_ctx, _cache, $props, $setup, $data, $options) {
+    return vue.openBlock(), vue.createElementBlock("view", { class: "recorder-container" }, [
+      vue.createElementVNode(
+        "view",
+        {
+          class: vue.normalizeClass(["recorder-card", { "dark-theme": $props.isDarkTheme }])
+        },
+        [
+          vue.createElementVNode("view", { class: "recorder-header" }, [
+            vue.createElementVNode("text", { class: "recorder-title" }, "睡眠录音"),
+            vue.createElementVNode("text", { class: "recorder-subtitle" }, "记录睡眠时的声音")
+          ]),
+          vue.createElementVNode("view", { class: "recorder-controls" }, [
+            vue.createElementVNode("view", { class: "recorder-status" }, [
+              vue.createElementVNode(
+                "view",
+                {
+                  class: vue.normalizeClass(["status-indicator", { "recording": $data.isRecording }])
+                },
+                [
+                  vue.createElementVNode("view", { class: "status-dot" })
+                ],
+                2
+                /* CLASS */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "status-text" },
+                vue.toDisplayString($data.isRecording ? "正在录音" : "未开始录音"),
+                1
+                /* TEXT */
+              )
+            ]),
+            vue.createElementVNode(
+              "view",
+              {
+                class: vue.normalizeClass(["recorder-button", { "recording": $data.isRecording }]),
+                onClick: _cache[0] || (_cache[0] = (...args) => $options.toggleRecording && $options.toggleRecording(...args))
+              },
+              [
+                vue.createElementVNode("view", { class: "button-inner" }, [
+                  vue.createElementVNode(
+                    "view",
+                    {
+                      class: vue.normalizeClass(["button-icon", { "recording": $data.isRecording }])
+                    },
+                    [
+                      vue.createElementVNode("view", { class: "icon-circle" })
+                    ],
+                    2
+                    /* CLASS */
+                  )
+                ])
+              ],
+              2
+              /* CLASS */
+            ),
+            $data.isRecording ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "recorder-info"
+            }, [
+              vue.createElementVNode(
+                "text",
+                { class: "time-display" },
+                vue.toDisplayString($options.formatTime($data.recordingDuration)),
+                1
+                /* TEXT */
+              ),
+              vue.createElementVNode(
+                "text",
+                { class: "size-display" },
+                vue.toDisplayString($options.formatFileSize($data.currentSize)),
+                1
+                /* TEXT */
+              )
+            ])) : vue.createCommentVNode("v-if", true)
+          ]),
+          vue.createElementVNode("view", { class: "recorder-tips" }, [
+            vue.createElementVNode("text", { class: "tip-text" }, "• 最长录音时间：5分钟"),
+            vue.createElementVNode("text", { class: "tip-text" }, "• 录音将自动保存"),
+            vue.createElementVNode("text", { class: "tip-text" }, "• 请确保麦克风权限已开启")
+          ])
+        ],
+        2
+        /* CLASS */
+      )
+    ]);
+  }
+  const __easycom_0 = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["render", _sfc_render$4], ["__scopeId", "data-v-aaa3e8c8"], ["__file", "E:/D/CODE/IOT_SYS/SleepMonitor/SleepMonitor/components/audio-recorder/audio-recorder.vue"]]);
+  const _sfc_main$4 = {
     components: {
       AudioRecorder: __easycom_0
     },
     data() {
       return {
+        isDarkTheme: false,
         currentTime: "",
         charts: {},
-        // 存储数据范围（一次性统计的结果）
-        dataRanges: {
-          heartRate: { min: null, max: null },
-          oxygen: { min: null, max: null },
-          temperature: { min: null, max: null },
-          snore: { min: null, max: null }
-        },
-        // 存储当前显示的数据
         chartData: {
           heartRate: {
             times: [],
             values: []
           },
-          oxygen: {
+          breathingRate: {
             times: [],
             values: []
           },
@@ -73990,10 +74042,10 @@ if (uni.restoreGlobal) {
             values: []
           }
         },
-        lastRecording: null,
         timer: null,
         totalHours: 24,
-        displayHours: 8
+        displayHours: 8,
+        startTimeIndex: 0
       };
     },
     onLoad() {
@@ -74018,24 +74070,97 @@ if (uni.restoreGlobal) {
       }, 300);
     },
     methods: {
+      toggleTheme() {
+        this.isDarkTheme = !this.isDarkTheme;
+        this.updateChartsTheme();
+      },
+      updateChartsTheme() {
+        this.isDarkTheme ? "dark" : "light";
+        const textColor = this.isDarkTheme ? "#fff" : "#333";
+        const gridColor = this.isDarkTheme ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
+        const splitLineColor = this.isDarkTheme ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)";
+        const splitAreaColor = this.isDarkTheme ? ["rgba(255,255,255,0.02)", "rgba(255,255,255,0.04)"] : ["rgba(0,0,0,0.01)", "rgba(0,0,0,0.02)"];
+        Object.entries(this.charts).forEach(([type, chart]) => {
+          if (!chart)
+            return;
+          chart.setOption({
+            title: {
+              textStyle: {
+                color: textColor
+              }
+            },
+            dataZoom: [{
+              type: "inside",
+              start: 0,
+              end: this.displayHours * 4 / (this.totalHours * 4) * 100,
+              zoomOnMouseWheel: false,
+              moveOnMouseMove: true,
+              moveOnMouseWheel: false,
+              preventDefaultMouseMove: true,
+              throttle: 0,
+              rangeMode: ["value", "value"],
+              filterMode: "filter",
+              zoomLock: true,
+              minSpan: this.displayHours * 4 / (this.totalHours * 4) * 100,
+              maxSpan: this.displayHours * 4 / (this.totalHours * 4) * 100
+            }],
+            xAxis: {
+              axisLine: {
+                lineStyle: {
+                  color: gridColor
+                }
+              },
+              axisLabel: {
+                color: textColor
+              },
+              axisTick: {
+                lineStyle: {
+                  color: gridColor
+                }
+              },
+              splitLine: {
+                lineStyle: {
+                  color: splitLineColor
+                }
+              },
+              splitArea: {
+                areaStyle: {
+                  color: splitAreaColor
+                }
+              }
+            },
+            yAxis: {
+              axisLine: {
+                lineStyle: {
+                  color: gridColor
+                }
+              },
+              axisLabel: {
+                color: textColor
+              },
+              axisTick: {
+                lineStyle: {
+                  color: gridColor
+                }
+              },
+              splitLine: {
+                lineStyle: {
+                  color: splitLineColor
+                }
+              },
+              splitArea: {
+                areaStyle: {
+                  color: splitAreaColor
+                }
+              }
+            }
+          });
+        });
+      },
       updateTime() {
         const now = /* @__PURE__ */ new Date();
         this.currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       },
-      // 一次性统计所有数据的范围
-      calculateDataRanges(allData) {
-        Object.keys(allData).forEach((type) => {
-          const values = allData[type].values;
-          if (values && values.length > 0) {
-            this.dataRanges[type] = {
-              min: Math.floor(Math.min(...values)),
-              max: Math.ceil(Math.max(...values))
-            };
-          }
-        });
-        formatAppLog("log", "at pages/sleep/index.vue:153", "数据范围统计结果：", this.dataRanges);
-      },
-      // 加载数据并一次性统计范围
       loadData() {
         const generateData = (base2, range, count2) => {
           return Array.from(
@@ -74043,88 +74168,108 @@ if (uni.restoreGlobal) {
             () => Math.round((base2 + (Math.random() - 0.5) * range) * 10) / 10
           );
         };
-        const timePoints = Array.from({ length: this.totalHours }, (_, i2) => {
-          const hour = (i2 + 24 - this.totalHours + 24) % 24;
-          return `${String(hour).padStart(2, "0")}:00`;
+        const timePoints = Array.from({ length: this.totalHours * 4 }, (_, i2) => {
+          const hour = Math.floor(i2 / 4);
+          const minute = i2 % 4 * 15;
+          return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
         });
-        const allData = {
+        this.chartData = {
           heartRate: {
             times: timePoints,
-            values: generateData(75, 10, this.totalHours)
+            values: generateData(75, 10, this.totalHours * 4)
           },
-          oxygen: {
+          breathingRate: {
             times: timePoints,
-            values: generateData(98, 2, this.totalHours)
+            values: generateData(16, 4, this.totalHours * 4)
           },
           temperature: {
             times: timePoints,
-            values: generateData(36.5, 0.5, this.totalHours)
+            values: generateData(36.5, 0.5, this.totalHours * 4)
           },
           snore: {
             times: timePoints,
-            values: generateData(30, 15, this.totalHours)
+            values: generateData(30, 15, this.totalHours * 4)
           }
         };
-        this.calculateDataRanges(allData);
-        this.chartData = allData;
       },
-      // 初始化图表
       initCharts() {
         const chartConfig = {
           grid: {
-            top: 40,
-            right: 20,
-            bottom: 20,
-            left: 60,
+            top: 35,
+            right: 5,
+            bottom: 5,
+            left: 5,
             containLabel: true
-          },
-          tooltip: {
-            trigger: "axis",
-            axisPointer: {
-              type: "cross",
-              label: {
-                backgroundColor: "#6a7985"
-              }
-            },
-            // 移动端优化
-            confine: true,
-            enterable: true
           },
           dataZoom: [{
             type: "inside",
-            start: (this.totalHours - this.displayHours) / this.totalHours * 100,
-            end: 100,
-            zoomLock: true,
-            rangeMode: ["value", "value"],
-            minSpan: 33.33,
-            maxSpan: 33.33,
-            moveHandleSize: 0,
-            preventDefaultMouseMove: false,
-            // 移动端优化
-            throttle: 100,
+            start: 0,
+            end: this.displayHours * 4 / (this.totalHours * 4) * 100,
             zoomOnMouseWheel: false,
             moveOnMouseMove: true,
-            moveOnMouseWheel: false
+            moveOnMouseWheel: false,
+            preventDefaultMouseMove: true,
+            throttle: 0,
+            rangeMode: ["value", "value"],
+            filterMode: "filter",
+            zoomLock: true,
+            minSpan: this.displayHours * 4 / (this.totalHours * 4) * 100,
+            maxSpan: this.displayHours * 4 / (this.totalHours * 4) * 100
           }],
+          tooltip: {
+            trigger: "axis",
+            axisPointer: {
+              type: "line",
+              lineStyle: {
+                color: "rgba(0,0,0,0.1)",
+                width: 1,
+                type: "solid"
+              }
+            },
+            backgroundColor: "rgba(255,255,255,0.9)",
+            borderColor: "rgba(0,0,0,0.1)",
+            borderWidth: 1,
+            textStyle: {
+              color: "#666",
+              fontSize: 12
+            },
+            padding: [8, 12]
+          },
           xAxis: {
             type: "category",
-            boundaryGap: false,
+            boundaryGap: true,
             data: [],
             axisLine: {
+              show: true,
               lineStyle: {
-                color: "#999"
+                color: "rgba(0,0,0,0.08)",
+                width: 1
               }
             },
             axisLabel: {
-              color: "#666",
-              rotate: 45,
+              color: "#999",
+              fontSize: 10,
+              rotate: 0,
               interval: "auto",
               formatter: (value) => {
                 return value.split(":")[0] + "时";
               }
             },
             axisTick: {
-              alignWithLabel: true
+              show: true,
+              alignWithLabel: true,
+              lineStyle: {
+                color: "rgba(0,0,0,0.08)",
+                width: 1
+              }
+            },
+            splitLine: {
+              show: true,
+              lineStyle: {
+                color: "rgba(0,0,0,0.03)",
+                type: "dashed",
+                width: 1
+              }
             }
           },
           yAxis: {
@@ -74132,47 +74277,68 @@ if (uni.restoreGlobal) {
             axisLine: {
               show: true,
               lineStyle: {
-                color: "#999"
+                color: "rgba(0,0,0,0.08)",
+                width: 1
               }
             },
             axisLabel: {
-              color: "#666"
+              color: "#999",
+              fontSize: 10,
+              margin: 8
             },
-            splitLine: {
+            axisTick: {
+              show: true,
               lineStyle: {
-                type: "dashed",
-                color: "#ddd"
+                color: "rgba(0,0,0,0.08)",
+                width: 1
               }
             },
-            min: (value) => {
-              var _a2;
-              const type = this.getChartType(value.name);
-              return ((_a2 = this.dataRanges[type]) == null ? void 0 : _a2.min) ?? value.min;
-            },
-            max: (value) => {
-              var _a2;
-              const type = this.getChartType(value.name);
-              return ((_a2 = this.dataRanges[type]) == null ? void 0 : _a2.max) ?? value.max;
+            splitLine: {
+              show: true,
+              lineStyle: {
+                type: "dashed",
+                color: "rgba(0,0,0,0.03)",
+                width: 1
+              }
             }
           },
           series: [{
             type: "line",
             smooth: true,
             symbol: "circle",
-            symbolSize: 6,
+            symbolSize: 4,
+            showSymbol: false,
             data: [],
             areaStyle: {
-              opacity: 0.1
+              opacity: 0.15,
+              color: new LinearGradient$1(0, 0, 0, 1, [{
+                offset: 0,
+                color: "rgba(0,0,0,0.2)"
+              }, {
+                offset: 1,
+                color: "rgba(0,0,0,0.05)"
+              }])
             },
             lineStyle: {
-              width: 2
-            }
+              width: 2,
+              shadowColor: "rgba(0,0,0,0.1)",
+              shadowBlur: 4
+            },
+            emphasis: {
+              focus: "series",
+              itemStyle: {
+                borderWidth: 2
+              }
+            },
+            animation: false,
+            zlevel: 1,
+            z: 1
           }]
         };
-        const initChart = (id, name, color, type) => {
+        const initChart = (id, name, color) => {
           const dom = document.getElementById(id);
           if (!dom) {
-            formatAppLog("error", "at pages/sleep/index.vue:302", `找不到图表容器: ${id}`);
+            formatAppLog("error", "at pages/sleep/index.vue:409", `找不到图表容器: ${id}`);
             return null;
           }
           const chart = init$1(dom, null, {
@@ -74186,46 +74352,29 @@ if (uni.restoreGlobal) {
               ...chartConfig.series[0],
               name,
               itemStyle: {
-                color
+                color,
+                borderColor: "#fff",
+                borderWidth: 1
+              },
+              areaStyle: {
+                ...chartConfig.series[0].areaStyle,
+                color: new LinearGradient$1(0, 0, 0, 1, [{
+                  offset: 0,
+                  color: color.replace(")", ", 0.2)").replace("rgb", "rgba")
+                }, {
+                  offset: 1,
+                  color: color.replace(")", ", 0.05)").replace("rgb", "rgba")
+                }])
               }
             }]
           });
-          dom.addEventListener("touchstart", (e2) => {
-            chart.dispatchAction({
-              type: "takeGlobalCursor",
-              key: "dataZoomSelect",
-              dataZoomSelectActive: true
-            });
-          }, { passive: true });
-          dom.addEventListener("touchend", () => {
-            chart.dispatchAction({
-              type: "takeGlobalCursor",
-              key: "dataZoomSelect",
-              dataZoomSelectActive: false
-            });
-          }, { passive: true });
-          chart.type = type;
           return chart;
         };
-        this.charts.heartRate = initChart("heartRateChart", "心率", "#1890FF", "heartRate");
-        this.charts.oxygen = initChart("oxygenChart", "血氧", "#91CB74", "oxygen");
-        this.charts.temperature = initChart("temperatureChart", "温度", "#FAC858", "temperature");
-        this.charts.snore = initChart("snoreChart", "鼾声", "#EE6666", "snore");
+        this.charts.heartRate = initChart("heartRateChart", "心率", "#1890FF");
+        this.charts.breathingRate = initChart("breathingRateChart", "呼吸", "#91CB74");
+        this.charts.temperature = initChart("temperatureChart", "体温", "#FAC858");
+        this.charts.snore = initChart("snoreChart", "鼾声", "#EE6666");
         window.addEventListener("resize", this.resizeCharts);
-      },
-      getChartType(chartName) {
-        switch (chartName) {
-          case "心率":
-            return "heartRate";
-          case "血氧":
-            return "oxygen";
-          case "温度":
-            return "temperature";
-          case "鼾声":
-            return "snore";
-          default:
-            return "";
-        }
       },
       updateCharts() {
         Object.entries(this.charts).forEach(([type, chart]) => {
@@ -74237,15 +74386,7 @@ if (uni.restoreGlobal) {
             },
             series: [{
               data: this.chartData[type].values
-            }],
-            // 确保移动端交互正常
-            dataZoom: [{
-              start: (this.totalHours - this.displayHours) / this.totalHours * 100,
-              end: 100
             }]
-          }, {
-            notMerge: false,
-            lazyUpdate: true
           });
         });
       },
@@ -74255,7 +74396,7 @@ if (uni.restoreGlobal) {
         });
       },
       handleRecordingComplete(recording) {
-        formatAppLog("log", "at pages/sleep/index.vue:399", "录音完成:", recording);
+        formatAppLog("log", "at pages/sleep/index.vue:476", "录音完成:", recording);
         this.lastRecording = recording;
       },
       // 添加新数据点（不再更新范围）
@@ -74276,6 +74417,10 @@ if (uni.restoreGlobal) {
             data: this.chartData[type].values
           }]
         });
+      },
+      formatTime(timestamp) {
+        const date = new Date(timestamp);
+        return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
       }
     },
     onUnload() {
@@ -74288,82 +74433,421 @@ if (uni.restoreGlobal) {
       });
     }
   };
+  function _sfc_render$3(_ctx, _cache, $props, $setup, $data, $options) {
+    return vue.openBlock(), vue.createElementBlock(
+      "view",
+      {
+        class: vue.normalizeClass(["sleep-container", { "dark-theme": $data.isDarkTheme }])
+      },
+      [
+        vue.createCommentVNode(" 顶部状态卡片 "),
+        vue.createElementVNode("view", { class: "status-card" }, [
+          vue.createElementVNode("view", { class: "status-header" }, [
+            vue.createElementVNode("text", { class: "status-title" }, "睡眠状态"),
+            vue.createElementVNode("view", { class: "header-right" }, [
+              vue.createElementVNode("view", {
+                class: "theme-switch",
+                onClick: _cache[0] || (_cache[0] = (...args) => $options.toggleTheme && $options.toggleTheme(...args))
+              }, [
+                vue.createElementVNode(
+                  "text",
+                  { class: "theme-icon" },
+                  vue.toDisplayString($data.isDarkTheme ? "🌙" : "☀️"),
+                  1
+                  /* TEXT */
+                )
+              ])
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "status-content" }, [
+            vue.createElementVNode("view", { class: "status-item" }, [
+              vue.createElementVNode("text", { class: "status-label" }, "睡眠时长"),
+              vue.createElementVNode("text", { class: "status-value" }, "9:06")
+            ]),
+            vue.createElementVNode("view", { class: "status-item" }, [
+              vue.createElementVNode("text", { class: "status-label" }, "入睡时间"),
+              vue.createElementVNode("text", { class: "status-value" }, "23:09")
+            ]),
+            vue.createElementVNode("view", { class: "status-item" }, [
+              vue.createElementVNode("text", { class: "status-label" }, "醒来时间"),
+              vue.createElementVNode("text", { class: "status-value" }, "08:15")
+            ])
+          ])
+        ]),
+        vue.createCommentVNode(" 数据图表区域 "),
+        vue.createElementVNode("view", { class: "charts-container" }, [
+          vue.createElementVNode("view", { class: "chart-item" }, [
+            vue.createElementVNode("text", { class: "chart-title" }, "心率变化"),
+            vue.createElementVNode("view", { class: "chart-box" }, [
+              vue.createElementVNode("view", {
+                class: "echarts",
+                id: "heartRateChart"
+              })
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "chart-item" }, [
+            vue.createElementVNode("text", { class: "chart-title" }, "呼吸频率"),
+            vue.createElementVNode("view", { class: "chart-box" }, [
+              vue.createElementVNode("view", {
+                class: "echarts",
+                id: "breathingRateChart"
+              })
+            ])
+          ]),
+          vue.createElementVNode("view", { class: "chart-item" }, [
+            vue.createElementVNode("text", { class: "chart-title" }, "体温变化"),
+            vue.createElementVNode("view", { class: "chart-box" }, [
+              vue.createElementVNode("view", {
+                class: "echarts",
+                id: "temperatureChart"
+              })
+            ])
+          ]),
+          vue.createCommentVNode(" 鼾声图表 "),
+          vue.createElementVNode("view", { class: "chart-item" }, [
+            vue.createElementVNode("text", { class: "chart-title" }, "鼾声监测"),
+            vue.createElementVNode("view", { class: "chart-box" }, [
+              vue.createElementVNode("view", {
+                class: "echarts",
+                id: "snoreChart"
+              })
+            ])
+          ])
+        ])
+      ],
+      2
+      /* CLASS */
+    );
+  }
+  const PagesSleepIndex = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["render", _sfc_render$3], ["__file", "E:/D/CODE/IOT_SYS/SleepMonitor/SleepMonitor/pages/sleep/index.vue"]]);
+  const _sfc_main$3 = {
+    components: {
+      AudioRecorder: __easycom_0
+    },
+    data() {
+      return {
+        isDarkTheme: false,
+        recordings: [
+          {
+            timestamp: Date.now() - 36e5 * 2,
+            // 2小时前
+            duration: 7200,
+            // 2小时
+            size: 1024 * 1024 * 2,
+            // 2MB
+            snoreData: {
+              count: 45,
+              details: [
+                { time: 1200, intensity: 65, duration: 3 },
+                { time: 1800, intensity: 70, duration: 2 },
+                { time: 2400, intensity: 68, duration: 4 }
+              ],
+              averageIntensity: 67.5
+            }
+          },
+          {
+            timestamp: Date.now() - 36e5 * 24,
+            // 1天前
+            duration: 3600,
+            // 1小时
+            size: 1024 * 1024,
+            // 1MB
+            snoreData: {
+              count: 25,
+              details: [
+                { time: 600, intensity: 62, duration: 2 },
+                { time: 1200, intensity: 68, duration: 3 },
+                { time: 1800, intensity: 65, duration: 2 }
+              ],
+              averageIntensity: 65
+            }
+          },
+          {
+            timestamp: Date.now() - 36e5 * 48,
+            // 2天前
+            duration: 5400,
+            // 1.5小时
+            size: 1024 * 1024 * 1.5,
+            // 1.5MB
+            snoreData: {
+              count: 35,
+              details: [
+                { time: 900, intensity: 70, duration: 3 },
+                { time: 1800, intensity: 65, duration: 2 },
+                { time: 2700, intensity: 72, duration: 4 }
+              ],
+              averageIntensity: 69
+            }
+          }
+        ],
+        audioContext: null,
+        maxDisplayRecords: 5,
+        mockData: {
+          snoreFrequency: {
+            min: 2,
+            max: 8
+          },
+          snoreIntensity: {
+            min: 45,
+            max: 75
+          },
+          snoreDuration: {
+            min: 1,
+            max: 5
+          }
+        }
+      };
+    },
+    onLoad() {
+      this.audioContext = uni.createInnerAudioContext();
+      this.loadRecordings();
+    },
+    methods: {
+      // 加载录音记录
+      loadRecordings() {
+        const recordings = uni.getStorageSync("recordings") || [];
+        this.recordings = recordings;
+      },
+      // 保存录音记录
+      saveRecordings() {
+        uni.setStorageSync("recordings", this.recordings);
+      },
+      // 处理录音完成事件
+      handleRecordingComplete(recording) {
+        const snoreData = this.generateMockSnoreData(recording.duration);
+        this.recordings.unshift({
+          ...recording,
+          timestamp: Date.now(),
+          snoreData
+        });
+        this.saveRecordings();
+      },
+      // 处理录音错误
+      handleRecordingError(error2) {
+        formatAppLog("error", "at pages/recorder/index.vue:170", "录音错误：", error2);
+        uni.showToast({
+          title: "录音失败：" + error2.message,
+          icon: "error"
+        });
+      },
+      // 生成模拟的鼾声数据
+      generateMockSnoreData(duration) {
+        const minutes = duration / 60;
+        const snoreCount = Math.floor(minutes * (Math.random() * (this.mockData.snoreFrequency.max - this.mockData.snoreFrequency.min) + this.mockData.snoreFrequency.min));
+        const snoreEvents = [];
+        let totalIntensity = 0;
+        for (let i2 = 0; i2 < snoreCount; i2++) {
+          const intensity = Math.random() * (this.mockData.snoreIntensity.max - this.mockData.snoreIntensity.min) + this.mockData.snoreIntensity.min;
+          const snoreDuration = Math.random() * (this.mockData.snoreDuration.max - this.mockData.snoreDuration.min) + this.mockData.snoreDuration.min;
+          const time = Math.random() * duration;
+          snoreEvents.push({
+            time,
+            intensity,
+            duration: snoreDuration
+          });
+          totalIntensity += intensity;
+        }
+        return {
+          count: snoreCount,
+          details: snoreEvents,
+          averageIntensity: snoreCount > 0 ? totalIntensity / snoreCount : 0
+        };
+      },
+      // 格式化时间
+      formatTime(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor(seconds % 3600 / 60);
+        const remainingSeconds = Math.floor(seconds % 60);
+        if (hours > 0) {
+          return `${hours}小时${minutes}分${remainingSeconds}秒`;
+        } else if (minutes > 0) {
+          return `${minutes}分${remainingSeconds}秒`;
+        } else {
+          return `${remainingSeconds}秒`;
+        }
+      },
+      // 格式化日期
+      formatDate(timestamp) {
+        const date = new Date(timestamp);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const hours = date.getHours().toString().padStart(2, "0");
+        const minutes = date.getMinutes().toString().padStart(2, "0");
+        return `${month}月${day}日 ${hours}:${minutes}`;
+      },
+      // 格式化录音信息
+      formatRecordingInfo(recording) {
+        var _a2, _b2;
+        const date = this.formatDate(recording.timestamp);
+        const duration = this.formatTime(recording.duration);
+        const size = (recording.size / 1024).toFixed(1);
+        const snoreCount = ((_a2 = recording.snoreData) == null ? void 0 : _a2.count) || 0;
+        const avgIntensity = ((_b2 = recording.snoreData) == null ? void 0 : _b2.averageIntensity.toFixed(1)) || 0;
+        return {
+          date,
+          duration,
+          size: `${size} KB`,
+          snoreInfo: `${snoreCount}次 (平均${avgIntensity}分贝)`
+        };
+      },
+      // 播放录音
+      playRecording(recording) {
+        if (this.audioContext) {
+          this.audioContext.stop();
+          this.audioContext.src = recording.tempFilePath;
+          this.audioContext.play();
+        }
+      },
+      // 删除录音
+      deleteRecording(index) {
+        uni.showModal({
+          title: "确认删除",
+          content: "确定要删除这条录音记录吗？",
+          success: (res) => {
+            if (res.confirm) {
+              const recording = this.recordings[index];
+              uni.removeSavedFile({
+                filePath: recording.tempFilePath,
+                complete: () => {
+                  this.recordings.splice(index, 1);
+                  this.saveRecordings();
+                }
+              });
+            }
+          }
+        });
+      },
+      // 切换主题
+      toggleTheme() {
+        this.isDarkTheme = !this.isDarkTheme;
+        uni.setStorageSync("theme", this.isDarkTheme ? "dark" : "light");
+      }
+    },
+    onUnload() {
+      if (this.audioContext) {
+        this.audioContext.stop();
+        this.audioContext.destroy();
+      }
+    }
+  };
   function _sfc_render$2(_ctx, _cache, $props, $setup, $data, $options) {
     const _component_audio_recorder = resolveEasycom(vue.resolveDynamicComponent("audio-recorder"), __easycom_0);
-    return vue.openBlock(), vue.createElementBlock("view", { class: "sleep-container" }, [
-      vue.createCommentVNode(" 顶部状态卡片 "),
-      vue.createElementVNode("view", { class: "status-card" }, [
-        vue.createElementVNode("view", { class: "status-header" }, [
-          vue.createElementVNode("text", { class: "status-title" }, "今日睡眠状态"),
-          vue.createElementVNode(
-            "text",
-            { class: "status-time" },
-            vue.toDisplayString($data.currentTime),
-            1
-            /* TEXT */
-          )
+    return vue.openBlock(), vue.createElementBlock(
+      "view",
+      {
+        class: vue.normalizeClass(["recorder-page", { "dark-theme": $data.isDarkTheme }])
+      },
+      [
+        vue.createElementVNode("view", { class: "page-header" }, [
+          vue.createElementVNode("text", { class: "page-title" }, "录音"),
+          vue.createElementVNode("view", {
+            class: "theme-switch",
+            onClick: _cache[0] || (_cache[0] = (...args) => $options.toggleTheme && $options.toggleTheme(...args))
+          }, [
+            vue.createElementVNode(
+              "text",
+              { class: "theme-icon" },
+              vue.toDisplayString($data.isDarkTheme ? "🌞" : "🌙"),
+              1
+              /* TEXT */
+            )
+          ])
         ]),
-        vue.createElementVNode("view", { class: "status-content" }, [
-          vue.createElementVNode("view", { class: "status-item" }, [
-            vue.createElementVNode("text", { class: "status-label" }, "睡眠时长"),
-            vue.createElementVNode("text", { class: "status-value" }, "--:--")
+        vue.createElementVNode("view", { class: "page-content" }, [
+          vue.createCommentVNode(" 录音组件 "),
+          vue.createElementVNode("view", { class: "recorder-section" }, [
+            vue.createVNode(_component_audio_recorder, {
+              onRecordingComplete: $options.handleRecordingComplete,
+              onRecordingError: $options.handleRecordingError,
+              "is-dark-theme": $data.isDarkTheme
+            }, null, 8, ["onRecordingComplete", "onRecordingError", "is-dark-theme"])
           ]),
-          vue.createElementVNode("view", { class: "status-item" }, [
-            vue.createElementVNode("text", { class: "status-label" }, "睡眠质量"),
-            vue.createElementVNode("text", { class: "status-value" }, "--")
-          ]),
-          vue.createElementVNode("view", { class: "status-item" }, [
-            vue.createElementVNode("text", { class: "status-label" }, "入睡时间"),
-            vue.createElementVNode("text", { class: "status-value" }, "--:--")
+          vue.createCommentVNode(" 录音历史 "),
+          vue.createElementVNode("view", { class: "history-section" }, [
+            vue.createElementVNode("view", { class: "section-header" }, [
+              vue.createElementVNode("text", { class: "section-title" }, "录音历史"),
+              vue.createElementVNode(
+                "text",
+                { class: "section-subtitle" },
+                "最近" + vue.toDisplayString($data.maxDisplayRecords) + "次录音",
+                1
+                /* TEXT */
+              )
+            ]),
+            $data.recordings.length > 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+              key: 0,
+              class: "recording-list"
+            }, [
+              (vue.openBlock(true), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList($data.recordings.slice(0, $data.maxDisplayRecords), (recording, index) => {
+                  return vue.openBlock(), vue.createElementBlock("view", {
+                    class: "recording-item",
+                    key: recording.timestamp
+                  }, [
+                    vue.createElementVNode("view", { class: "recording-info" }, [
+                      vue.createElementVNode("view", { class: "recording-header" }, [
+                        vue.createElementVNode(
+                          "text",
+                          { class: "recording-date" },
+                          vue.toDisplayString($options.formatRecordingInfo(recording).date),
+                          1
+                          /* TEXT */
+                        )
+                      ]),
+                      vue.createElementVNode("view", { class: "recording-details" }, [
+                        vue.createElementVNode("view", { class: "detail-item" }, [
+                          vue.createElementVNode("text", { class: "detail-label" }, "录音时长"),
+                          vue.createElementVNode(
+                            "text",
+                            { class: "detail-value" },
+                            vue.toDisplayString($options.formatRecordingInfo(recording).duration),
+                            1
+                            /* TEXT */
+                          )
+                        ]),
+                        vue.createElementVNode("view", { class: "detail-item" }, [
+                          vue.createElementVNode("text", { class: "detail-label" }, "文件大小"),
+                          vue.createElementVNode(
+                            "text",
+                            { class: "detail-value" },
+                            vue.toDisplayString($options.formatRecordingInfo(recording).size),
+                            1
+                            /* TEXT */
+                          )
+                        ]),
+                        vue.createElementVNode("view", { class: "detail-item" }, [
+                          vue.createElementVNode("text", { class: "detail-label" }, "鼾声统计"),
+                          vue.createElementVNode(
+                            "text",
+                            { class: "detail-value" },
+                            vue.toDisplayString($options.formatRecordingInfo(recording).snoreInfo),
+                            1
+                            /* TEXT */
+                          )
+                        ])
+                      ])
+                    ])
+                  ]);
+                }),
+                128
+                /* KEYED_FRAGMENT */
+              ))
+            ])) : (vue.openBlock(), vue.createElementBlock("view", {
+              key: 1,
+              class: "empty-state"
+            }, [
+              vue.createElementVNode("text", { class: "empty-text" }, "暂无录音记录")
+            ]))
           ])
         ])
-      ]),
-      vue.createCommentVNode(" 数据图表区域 "),
-      vue.createElementVNode("view", { class: "charts-container" }, [
-        vue.createElementVNode("view", { class: "chart-item" }, [
-          vue.createElementVNode("text", { class: "chart-title" }, "心率数据 (次/分)"),
-          vue.createElementVNode("view", { class: "chart-box" }, [
-            vue.createElementVNode("view", {
-              class: "echarts",
-              id: "heartRateChart"
-            })
-          ])
-        ]),
-        vue.createElementVNode("view", { class: "chart-item" }, [
-          vue.createElementVNode("text", { class: "chart-title" }, "血氧数据 (%)"),
-          vue.createElementVNode("view", { class: "chart-box" }, [
-            vue.createElementVNode("view", {
-              class: "echarts",
-              id: "oxygenChart"
-            })
-          ])
-        ]),
-        vue.createElementVNode("view", { class: "chart-item" }, [
-          vue.createElementVNode("text", { class: "chart-title" }, "温度数据 (°C)"),
-          vue.createElementVNode("view", { class: "chart-box" }, [
-            vue.createElementVNode("view", {
-              class: "echarts",
-              id: "temperatureChart"
-            })
-          ])
-        ]),
-        vue.createElementVNode("view", { class: "chart-item" }, [
-          vue.createElementVNode("text", { class: "chart-title" }, "鼾声数据 (dB)"),
-          vue.createElementVNode("view", { class: "chart-box" }, [
-            vue.createElementVNode("view", {
-              class: "echarts",
-              id: "snoreChart"
-            })
-          ])
-        ])
-      ]),
-      vue.createCommentVNode(" 录音区域 "),
-      vue.createElementVNode("view", { class: "recorder-section" }, [
-        vue.createVNode(_component_audio_recorder, { onRecordingComplete: $options.handleRecordingComplete }, null, 8, ["onRecordingComplete"])
-      ])
-    ]);
+      ],
+      2
+      /* CLASS */
+    );
   }
-  const PagesSleepIndex = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["render", _sfc_render$2], ["__file", "E:/D/CODE/IOT_SYS/SleepMonitor/SleepMonitor/pages/sleep/index.vue"]]);
+  const PagesRecorderIndex = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["render", _sfc_render$2], ["__file", "E:/D/CODE/IOT_SYS/SleepMonitor/SleepMonitor/pages/recorder/index.vue"]]);
   const API_KEY = "sk-dec348849b6f408c9fb451d14ec996ad";
   const API_URL = "https://api.deepseek.com/v1/chat/completions";
   const _sfc_main$2 = {
@@ -74383,13 +74867,14 @@ if (uni.restoreGlobal) {
 - 保持友好和同理心
 - 不要给出具体的医疗诊断
 - 对于严重问题，建议及时就医
-- 回答要简洁明了，突出重点`
+- 回答要简洁明了，突出重点
+- 回答时不要用markdown格式来编辑字体加粗和标题等级，请用纯文本描述`
       };
     },
     onLoad() {
       this.messages.push({
         role: "assistant",
-        content: "您好！我是您的睡眠顾问，请问有什么可以帮助您的吗？",
+        content: "您好！我是您的AI睡眠顾问，请问有什么可以帮助您的吗？",
         time: this.formatTime(/* @__PURE__ */ new Date())
       });
     },
@@ -74414,7 +74899,7 @@ if (uni.restoreGlobal) {
             time: this.formatTime(/* @__PURE__ */ new Date())
           });
         } catch (error2) {
-          formatAppLog("error", "at pages/consult/consult.vue:101", "API调用错误:", error2);
+          formatAppLog("error", "at pages/consult/consult.vue:102", "API调用错误:", error2);
           let errorMessage = "抱歉，我遇到了一些问题，请稍后再试。";
           if (error2.status === 401) {
             errorMessage = "API密钥无效，请联系管理员。";
@@ -74491,7 +74976,7 @@ if (uni.restoreGlobal) {
         }, 100);
       },
       loadMoreMessages() {
-        formatAppLog("log", "at pages/consult/consult.vue:192", "加载更多消息");
+        formatAppLog("log", "at pages/consult/consult.vue:193", "加载更多消息");
       }
     }
   };
@@ -74590,98 +75075,93 @@ if (uni.restoreGlobal) {
   const _sfc_main$1 = {
     data() {
       return {
-        userInfo: null
+        isDarkTheme: false
       };
     },
+    onLoad() {
+      const theme2 = uni.getStorageSync("theme");
+      this.isDarkTheme = theme2 === "dark";
+    },
     methods: {
-      navigateTo(url) {
-        uni.navigateTo({
-          url
-        });
+      toggleTheme() {
+        this.isDarkTheme = !this.isDarkTheme;
+        uni.setStorageSync("theme", this.isDarkTheme ? "dark" : "light");
       }
     }
   };
   function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
-    return vue.openBlock(), vue.createElementBlock("view", { class: "profile-container" }, [
-      vue.createCommentVNode(" 顶部用户信息卡片 "),
-      vue.createElementVNode("view", { class: "user-card" }, [
-        vue.createElementVNode("view", { class: "user-info" }, [
-          vue.createElementVNode("image", {
-            class: "avatar",
-            src: _imports_0,
-            mode: "aspectFill"
-          }),
-          vue.createElementVNode("view", { class: "user-detail" }, [
-            vue.createElementVNode("text", { class: "username" }, "未登录"),
-            vue.createElementVNode("text", { class: "user-desc" }, "点击登录账号")
+    return vue.openBlock(), vue.createElementBlock(
+      "view",
+      {
+        class: vue.normalizeClass(["profile-container", { "dark-theme": $data.isDarkTheme }])
+      },
+      [
+        vue.createElementVNode("view", { class: "page-header" }, [
+          vue.createElementVNode("text", { class: "page-title" }, "个人中心"),
+          vue.createElementVNode("view", {
+            class: "theme-switch",
+            onClick: _cache[0] || (_cache[0] = (...args) => $options.toggleTheme && $options.toggleTheme(...args))
+          }, [
+            vue.createElementVNode(
+              "text",
+              { class: "theme-icon" },
+              vue.toDisplayString($data.isDarkTheme ? "☀️" : "🌙"),
+              1
+              /* TEXT */
+            )
           ])
         ]),
-        vue.createElementVNode("view", { class: "user-stats" }, [
-          vue.createElementVNode("view", { class: "stat-item" }, [
-            vue.createElementVNode("text", { class: "stat-num" }, "0"),
-            vue.createElementVNode("text", { class: "stat-label" }, "睡眠记录")
+        vue.createElementVNode("view", { class: "profile-content" }, [
+          vue.createCommentVNode(" 用户信息卡片 "),
+          vue.createElementVNode("view", { class: "profile-card" }, [
+            vue.createElementVNode("view", { class: "avatar-section" }, [
+              vue.createElementVNode("image", {
+                class: "avatar",
+                src: _imports_0,
+                mode: "aspectFill"
+              }),
+              vue.createElementVNode("view", { class: "user-info" }, [
+                vue.createElementVNode("text", { class: "username" }, "用户名"),
+                vue.createElementVNode("text", { class: "user-id" }, "ID: 123456")
+              ])
+            ])
           ]),
-          vue.createElementVNode("view", { class: "stat-item" }, [
-            vue.createElementVNode("text", { class: "stat-num" }, "0"),
-            vue.createElementVNode("text", { class: "stat-label" }, "咨询次数")
-          ]),
-          vue.createElementVNode("view", { class: "stat-item" }, [
-            vue.createElementVNode("text", { class: "stat-num" }, "0"),
-            vue.createElementVNode("text", { class: "stat-label" }, "健康评分")
+          vue.createCommentVNode(" 设置列表 "),
+          vue.createElementVNode("view", { class: "settings-list" }, [
+            vue.createElementVNode("view", { class: "settings-group" }, [
+              vue.createElementVNode("view", { class: "settings-item" }, [
+                vue.createElementVNode("text", { class: "item-label" }, "睡眠目标"),
+                vue.createElementVNode("text", { class: "item-value" }, "8小时")
+              ]),
+              vue.createElementVNode("view", { class: "settings-item" }, [
+                vue.createElementVNode("text", { class: "item-label" }, "提醒时间"),
+                vue.createElementVNode("text", { class: "item-value" }, "22:00")
+              ])
+            ]),
+            vue.createElementVNode("view", { class: "settings-group" }, [
+              vue.createElementVNode("view", { class: "settings-item" }, [
+                vue.createElementVNode("text", { class: "item-label" }, "关于我们"),
+                vue.createElementVNode("text", { class: "item-arrow" }, ">")
+              ]),
+              vue.createElementVNode("view", { class: "settings-item" }, [
+                vue.createElementVNode("text", { class: "item-label" }, "隐私政策"),
+                vue.createElementVNode("text", { class: "item-arrow" }, ">")
+              ]),
+              vue.createElementVNode("view", { class: "settings-item" }, [
+                vue.createElementVNode("text", { class: "item-label" }, "版本信息"),
+                vue.createElementVNode("text", { class: "item-value" }, "v1.0.0")
+              ])
+            ])
           ])
         ])
-      ]),
-      vue.createCommentVNode(" 功能列表 "),
-      vue.createElementVNode("view", { class: "menu-list" }, [
-        vue.createElementVNode("view", { class: "menu-group" }, [
-          vue.createElementVNode("view", {
-            class: "menu-item",
-            onClick: _cache[0] || (_cache[0] = ($event) => $options.navigateTo("/pages/profile/records"))
-          }, [
-            vue.createElementVNode("text", { class: "menu-icon" }, "📊"),
-            vue.createElementVNode("text", { class: "menu-text" }, "睡眠记录"),
-            vue.createElementVNode("text", { class: "menu-arrow" }, ">")
-          ]),
-          vue.createElementVNode("view", {
-            class: "menu-item",
-            onClick: _cache[1] || (_cache[1] = ($event) => $options.navigateTo("/pages/profile/analysis"))
-          }, [
-            vue.createElementVNode("text", { class: "menu-icon" }, "📈"),
-            vue.createElementVNode("text", { class: "menu-text" }, "睡眠分析"),
-            vue.createElementVNode("text", { class: "menu-arrow" }, ">")
-          ]),
-          vue.createElementVNode("view", {
-            class: "menu-item",
-            onClick: _cache[2] || (_cache[2] = ($event) => $options.navigateTo("/pages/profile/reports"))
-          }, [
-            vue.createElementVNode("text", { class: "menu-icon" }, "📝"),
-            vue.createElementVNode("text", { class: "menu-text" }, "健康报告"),
-            vue.createElementVNode("text", { class: "menu-arrow" }, ">")
-          ])
-        ]),
-        vue.createElementVNode("view", { class: "menu-group" }, [
-          vue.createElementVNode("view", {
-            class: "menu-item",
-            onClick: _cache[3] || (_cache[3] = ($event) => $options.navigateTo("/pages/profile/settings"))
-          }, [
-            vue.createElementVNode("text", { class: "menu-icon" }, "⚙️"),
-            vue.createElementVNode("text", { class: "menu-text" }, "设置"),
-            vue.createElementVNode("text", { class: "menu-arrow" }, ">")
-          ]),
-          vue.createElementVNode("view", {
-            class: "menu-item",
-            onClick: _cache[4] || (_cache[4] = ($event) => $options.navigateTo("/pages/profile/about"))
-          }, [
-            vue.createElementVNode("text", { class: "menu-icon" }, "ℹ️"),
-            vue.createElementVNode("text", { class: "menu-text" }, "关于我们"),
-            vue.createElementVNode("text", { class: "menu-arrow" }, ">")
-          ])
-        ])
-      ])
-    ]);
+      ],
+      2
+      /* CLASS */
+    );
   }
   const PagesProfileIndex = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["render", _sfc_render], ["__file", "E:/D/CODE/IOT_SYS/SleepMonitor/SleepMonitor/pages/profile/index.vue"]]);
   __definePage("pages/sleep/index", PagesSleepIndex);
+  __definePage("pages/recorder/index", PagesRecorderIndex);
   __definePage("pages/consult/consult", PagesConsultConsult);
   __definePage("pages/profile/index", PagesProfileIndex);
   const _sfc_main = {
