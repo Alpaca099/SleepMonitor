@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试图表</title>
+</head>
+<body>
+    <iframe id="chartIframe" src="chart.html#test1" style="width: 100%; height: 500px;"></iframe>
+
+    <script>
+        // 等待图表准备好
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'webviewReady') {
+                console.log('图表已准备好，开始发送数据');
+
+                const iframe = document.getElementById('chartIframe');
+                iframe.contentWindow.postMessage({
+                    type: 'dataUpdate',
+                    data: {
+                        times: ['0:00', '1:00', '2:00', '3:00', '4:00', '5:00', '6:00', '7:00'],
+                        values: [65, 63, 62, 64, 66, 67, 68, 65],
+                        color: 'rgb(0, 128, 255)',
+                        name: '心率',
+                        unit: '次/分'
+                    }
+                }, '*');
+            }
+        });
+    </script>
+</body>
+</html>
