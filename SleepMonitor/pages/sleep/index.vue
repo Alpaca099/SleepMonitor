@@ -1,747 +1,1178 @@
 <template>
 	<view class="sleep-container" :class="{ 'dark-theme': isDarkTheme }">
+		
+		<!-- 添加网络监控组件
+		<network-monitor
+			:isDarkTheme="isDarkTheme"
+			@data-updated="handleDataUpdated"
+			class="network-monitor-section"
+		/> -->
+		
+		<!-- 错误信息窗口 -->
+		<view class="error-panel" v-if="showErrorPanel" :class="{ 'dark-theme': isDarkTheme }">
+			<view class="error-header">
+				<text class="error-title">调试信息</text>
+				<view class="error-actions">
+					<view class="error-action" @tap="clearErrors">
+						<text class="action-icon">🗑️</text>
+					</view>
+					<view class="error-action" @tap="toggleErrorPanel">
+						<text class="action-icon">✕</text>
+					</view>
+		</view>
+	  </view>
+			<scroll-view class="error-content" scroll-y>
+				<view v-for="(log, index) in errorLogs" :key="index" class="error-item" :class="log.type">
+					<text class="error-time">{{ formatTime(log.timestamp) }}</text>
+					<text class="error-message">{{ log.message }}</text>
+					<text v-if="log.details" class="error-details">{{ log.details }}</text>
+				</view>
+			</scroll-view>
+		</view>
+
 		<view class="page-header">
 			<text class="page-title">睡眠记录</text>
-			<view class="theme-switch" @tap="toggleTheme">
-				<text class="theme-icon">{{ isDarkTheme ? '🌞' : '🌙' }}</text>
+			<view class="header-actions">
+
+				<!-- <view class="action-button" @tap="goToNetworkTest">
+					<text class="action-icon">📡</text>
+				</view> -->
+				
+				<view class="action-button" @tap="handleDataUpdated">
+					<text class="action-icon">🔄</text>
+				</view>
+				<view class="action-button" @tap="toggleTheme">
+					<text class="action-icon">{{ isDarkTheme ? '🌙' : '☀️' }}</text>
+				</view>
 			</view>
 		</view>
-
+  
 		<view class="page-content">
-			<!-- 顶部状态卡片 -->
-			<view class="status-card">
-				<view class="status-header">
-					<text class="status-title">睡眠状态</text>
-				</view>
-				<view class="status-content">
-					<view class="status-item">
-						<text class="status-label">睡眠时长</text>
-						<text class="status-value">9:06</text>
-					</view>
-					<view class="status-item">
-						<text class="status-label">入睡时间</text>
-						<text class="status-value">23:09</text>
-					</view>
-					<view class="status-item">
-						<text class="status-label">醒来时间</text>
-						<text class="status-value">08:15</text>
-					</view>
-				</view>
-			</view>
-			
-			<!-- 数据图表区域 -->
-			<view class="charts-container">
-				<view class="chart-item">
-					<text class="chart-title">心率变化</text>
+			<view class="chart-section">
+				<view class="chart-card">
+					<text class="chart-title heart-rate">心率变化</text>
 					<view class="chart-box">
-						<view class="echarts" id="heartRateChart"></view>
-					</view>
-				</view>
-				
-				<view class="chart-item">
-					<text class="chart-title">呼吸频率</text>
-					<view class="chart-box">
-						<view class="echarts" id="breathingRateChart"></view>
-					</view>
-				</view>
-				
-				<view class="chart-item">
-					<text class="chart-title">体温变化</text>
-					<view class="chart-box">
-						<view class="echarts" id="temperatureChart"></view>
+						<qiun-data-charts 
+							type="line"
+							:opts="heartRateOptions"
+							:chartData="heartRateData"
+							@inited="onChartInited('heartRate')"
+							@error="onChartError('heartRate', $event)"
+							:ontouch="true"
+							:onmouse="true"
+							:enableScroll="true"
+							:disableScroll="false"
+							:touchMoveLimit="60"
+							:onmovetip="true"
+						/>
 					</view>
 				</view>
 
-				<!-- 鼾声图表 -->
-				<view class="chart-item">
-					<text class="chart-title">鼾声监测</text>
+				<view class="chart-card">
+					<text class="chart-title blood-oxygen">血氧饱和度</text>
 					<view class="chart-box">
-						<view class="echarts" id="snoreChart"></view>
+						<qiun-data-charts 
+							type="line"
+							:opts="bloodOxygenOptions"
+							:chartData="bloodOxygenData"
+							@inited="onChartInited('bloodOxygen')"
+							@error="onChartError('bloodOxygen', $event)"
+							:ontouch="true"
+							:onmouse="true"
+							:enableScroll="true"
+							:disableScroll="false"
+							:touchMoveLimit="60"
+							:onmovetip="true"
+						/>
 					</view>
 				</view>
-			</view>
+
+				<view class="chart-card">
+					<text class="chart-title temperature">体温变化</text>
+					<view class="chart-box">
+						<qiun-data-charts 
+							type="line"
+							:opts="temperatureOptions"
+							:chartData="temperatureData"
+							@inited="onChartInited('temperature')"
+							@error="onChartError('temperature', $event)"
+							:ontouch="true"
+							:onmouse="true"
+							:enableScroll="true"
+							:disableScroll="false"
+							:touchMoveLimit="60"
+							:onmovetip="true"
+							:canvas2d="true"
+						/>
+					</view>
+				</view>
+
+				
 		</view>
+	  </view>
+  
+		<!-- 网络监控组件 -->
+		<view class="network-section" :class="{ 'collapsed': isNetworkCollapsed }">
+			<view class="network-header" @tap="toggleNetworkSection">
+				<text class="network-title">网络连接</text>
+				<text class="collapse-icon">{{ isNetworkCollapsed ? '▼' : '▲' }}</text>
+			</view>
+			<view class="network-content" v-show="!isNetworkCollapsed">
+				<network-monitor
+					:isDarkTheme="isDarkTheme"
+					@data-updated="handleDataUpdated"
+					class="monitor-component"
+				/>
+		</view>
+	  </view>
 	</view>
-</template>
-
-<script>
-	import * as echarts from 'echarts';
-	import AudioRecorder from '@/components/audio-recorder/audio-recorder.vue';
-	
-	export default {
+  </template>
+  
+  <script>
+  import AudioRecorder from '@/components/audio-recorder/audio-recorder.vue';
+  import NetworkMonitor from '@/components/network-monitor/network-monitor.vue';
+  
+  export default {
 		components: {
-			AudioRecorder
+			AudioRecorder,
+			NetworkMonitor
 		},
-		data() {
-			return {
-				isDarkTheme: false,
+	data() {
+	  return {
+		isDarkTheme: false,
 				currentTime: '',
-				charts: {},
-				chartData: {
-					heartRate: {
-						times: [],
-						values: []
-					},
-					breathingRate: {
-						times: [],
-						values: []
-					},
-					temperature: {
-						times: [],
-						values: []
-					},
-					snore: {
-						times: [],
-						values: []
-					}
-				},
-				timer: null,
-				totalHours: 24,
+				showErrorPanel: false,
+				errorLogs: [],
+				hasErrors: false,
+				errorCount: 0,
+		totalHours: 24,
 				displayHours: 8,
-				startTimeIndex: 0
-			}
-		},
-		onLoad() {
-			// 更新时间
-			this.updateTime();
-			this.timer = setInterval(this.updateTime, 1000);
-			
-			// 加载数据
-			this.loadData();
-		},
-		onReady() {
-			// 确保DOM已经渲染完成后再初始化图表
-			setTimeout(() => {
-				// 添加移动端触摸样式
-				const style = document.createElement('style');
-				style.textContent = `
-					.echarts {
-						-webkit-tap-highlight-color: transparent;
-						touch-action: pan-x pan-y;
-						user-select: none;
-						-webkit-user-select: none;
-					}
-				`;
-				document.head.appendChild(style);
+				startTimeIndex: 0,
 				
-				this.initCharts();
-				// 初始化后立即更新数据
-				this.updateCharts();
-			}, 300);
-		},
-		methods: {
-			toggleTheme() {
-				this.isDarkTheme = !this.isDarkTheme;
-				uni.setStorageSync('theme', this.isDarkTheme ? 'dark' : 'light');
-				this.updateChartsTheme();
-			},
-			
-			updateChartsTheme() {
-				const theme = this.isDarkTheme ? 'dark' : 'light';
-				const textColor = this.isDarkTheme ? '#fff' : '#333';
-				const gridColor = this.isDarkTheme ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
-				const splitLineColor = this.isDarkTheme ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
-				const splitAreaColor = this.isDarkTheme 
-					? ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.04)']
-					: ['rgba(0,0,0,0.01)', 'rgba(0,0,0,0.02)'];
-				
-				Object.entries(this.charts).forEach(([type, chart]) => {
-					if (!chart) return;
-					
-					chart.setOption({
-						title: {
-							textStyle: {
-								color: textColor
-							}
-						},
-						dataZoom: [{
-							type: 'inside',
-							start: 0,
-							end: (this.displayHours * 4) / (this.totalHours * 4) * 100,
-							zoomOnMouseWheel: false,
-							moveOnMouseMove: true,
-							moveOnMouseWheel: false,
-							preventDefaultMouseMove: true,
-							throttle: 0,
-							rangeMode: ['value', 'value'],
-							filterMode: 'filter',
-							zoomLock: true,
-							minSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100,
-							maxSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100
-						}],
-						xAxis: {
-							axisLine: {
-								lineStyle: {
-									color: gridColor
-								}
-							},
-							axisLabel: {
-								color: textColor
-							},
-							axisTick: {
-								lineStyle: {
-									color: gridColor
-								}
-							},
-							splitLine: {
-								lineStyle: {
-									color: splitLineColor
-								}
-							},
-							splitArea: {
-								areaStyle: {
-									color: splitAreaColor
-								}
-							}
-						},
-						yAxis: {
-							axisLine: {
-								lineStyle: {
-									color: gridColor
-								}
-							},
-							axisLabel: {
-								color: textColor
-							},
-							axisTick: {
-								lineStyle: {
-									color: gridColor
-								}
-							},
-							splitLine: {
-								lineStyle: {
-									color: splitLineColor
-								}
-							},
-							splitArea: {
-								areaStyle: {
-									color: splitAreaColor
-								}
-							}
-						}
-					});
-				});
-			},
-			updateTime() {
-				const now = new Date();
-				this.currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-			},
-			loadData() {
-				// 生成模拟数据
-				const generateData = (base, range, count) => {
-					return Array.from({length: count}, () => 
-						Math.round((base + (Math.random() - 0.5) * range) * 10) / 10
-					);
-				};
-				
-				// 生成24小时的时间点，每15分钟一个数据点
-				const timePoints = Array.from({length: this.totalHours * 4}, (_, i) => {
-					const hour = Math.floor(i / 4);
-					const minute = (i % 4) * 15;
-					return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-				});
-				
-				// 生成所有数据
-				this.chartData = {
-					heartRate: {
-						times: timePoints,
-						values: generateData(75, 10, this.totalHours * 4)
-					},
-					breathingRate: {
-						times: timePoints,
-						values: generateData(16, 4, this.totalHours * 4)
-					},
-					temperature: {
-						times: timePoints,
-						values: generateData(36.5, 0.5, this.totalHours * 4)
-					},
-					snore: {
-						times: timePoints,
-						values: generateData(30, 15, this.totalHours * 4)
-					}
-				};
-			},
-			
-			initCharts() {
-				const chartConfig = {
-					grid: {
-						top: 35,
-						right: 5,
-						bottom: 5,
-						left: 5,
-						containLabel: true
-					},
-					dataZoom: [{
-						type: 'inside',
-						start: 0,
-						end: (this.displayHours * 4) / (this.totalHours * 4) * 100,
-						zoomOnMouseWheel: false,
-						moveOnMouseMove: true,
-						moveOnMouseWheel: false,
-						preventDefaultMouseMove: true,
-						throttle: 0,
-						rangeMode: ['value', 'value'],
-						filterMode: 'filter',
-						zoomLock: true,
-						minSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100,
-						maxSpan: (this.displayHours * 4) / (this.totalHours * 4) * 100
-					}],
-					tooltip: {
-						trigger: 'axis',
-						axisPointer: {
-							type: 'line',
-							lineStyle: {
-								color: 'rgba(0,0,0,0.1)',
-								width: 1,
-								type: 'solid'
-							}
-						},
-						backgroundColor: 'rgba(255,255,255,0.9)',
-						borderColor: 'rgba(0,0,0,0.1)',
-						borderWidth: 1,
-						textStyle: {
-							color: '#666',
-							fontSize: 12
-						},
-						padding: [8, 12]
+				// 图表数据
+				heartRateData: {
+					categories: [],
+					series: [{
+						name: '心率',
+						data: []
+					}]
+				},
+				bloodOxygenData: {
+					categories: [],
+					series: [{
+						name: '血氧',
+						data: []
+					}]
+				},
+				temperatureData: {
+					categories: [],
+					series: [{
+						name: '体温',
+						data: []
+					}]
+				},
+				snoreData: {
+					categories: [],
+					series: [{
+						name: '鼾声',
+						data: []
+					}]
+				},
+
+				// 图表配置
+				chartOpts: {
+					type: 'line',
+					width: '100%',
+					height: '300px',
+					background: 'transparent',
+					padding: [15, 15, 0, 15],
+					legend: {
+						show: true,
+						position: 'top',
+						float: 'center',
+						padding: 5,
+						margin: 5,
+						backgroundColor: 'transparent',
+						borderColor: 'transparent',
+						borderWidth: 0,
+						fontSize: 12,
+						lineHeight: 11,
+						hiddenColor: '#CECECE',
+						itemGap: 25,
+						textColor: '#666666'
 					},
 					xAxis: {
-						type: 'category',
-						boundaryGap: true,
-						data: [],
-						axisLine: {
-							show: true,
-							lineStyle: {
-								color: 'rgba(0,0,0,0.08)',
-								width: 1
-							}
-						},
-						axisLabel: {
-							color: '#999',
-							fontSize: 10,
-							rotate: 0,
-							interval: 'auto',
-							formatter: (value) => {
-								return value.split(':')[0] + '时';
-							}
-						},
-						axisTick: {
-							show: true,
-							alignWithLabel: true,
-							lineStyle: {
-								color: 'rgba(0,0,0,0.08)',
-								width: 1
-							}
-						},
-						splitLine: {
-							show: true,
-							lineStyle: {
-								color: 'rgba(0,0,0,0.03)',
-								type: 'dashed',
-								width: 1
-							}
+						disableGrid: true,
+						axisLine: true,
+						axisLineColor: '#CCCCCC',
+						calibration: false,
+						fontColor: '#666666',
+						fontSize: 12,
+						rotateLabel: false,
+						itemCount: 5,
+						boundaryGap: 'center',
+						format: (val) => {
+							return val.split(':')[0] + '时';
 						}
 					},
 					yAxis: {
-						type: 'value',
-						axisLine: {
-							show: true,
-							lineStyle: {
-								color: 'rgba(0,0,0,0.08)',
-								width: 1
-							}
+						gridType: 'dash',
+						dashLength: 2,
+						gridColor: '#CCCCCC',
+						gridCount: 5,
+						min: 0,
+						max: 100,
+						format: (val) => {
+							return val.toFixed(0);
 						},
-						axisLabel: {
-							color: '#999',
-							fontSize: 10,
-							margin: 8
-						},
-						axisTick: {
-							show: true,
-							lineStyle: {
-								color: 'rgba(0,0,0,0.08)',
-								width: 1
+						data: [{
+							title: '心率',
+							titleFontSize: 12,
+							titleFontColor: '#666666',
+							format: (val) => {
+								return val.toFixed(0) + ' bpm';
 							}
-						},
-						splitLine: {
-							show: true,
-							lineStyle: {
-								type: 'dashed',
-								color: 'rgba(0,0,0,0.03)',
-								width: 1
+						}, {
+							title: '血氧',
+							titleFontSize: 12,
+							titleFontColor: '#666666',
+							format: (val) => {
+								return val.toFixed(0) + ' %';
 							}
-						}
+						}, {
+							title: '体温',
+							titleFontSize: 12,
+							titleFontColor: '#666666',
+							format: (val) => {
+								return val.toFixed(1) + ' ℃';
+							}
+						}]
 					},
-					series: [{
-						type: 'line',
-						smooth: true,
-						symbol: 'circle',
-						symbolSize: 4,
-						showSymbol: false,
-						data: [],
-						areaStyle: {
-							opacity: 0.15,
-							color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
-								offset: 0,
-								color: 'rgba(0,0,0,0.2)'
-							}, {
-								offset: 1,
-								color: 'rgba(0,0,0,0.05)'
-							}])
-						},
-						lineStyle: {
+					extra: {
+						line: {
+							type: 'straight',
 							width: 2,
-							shadowColor: 'rgba(0,0,0,0.1)',
-							shadowBlur: 4
+							activeType: 'hollow',
+							smooth: true,
+							smoothType: 'quadratic'
 						},
-						emphasis: {
-							focus: 'series',
-							itemStyle: {
-								borderWidth: 2
-							}
-						},
-						animation: false,
-						zlevel: 1,
-						z: 1
-					}]
-				};
-				
-				// 初始化图表
-				const initChart = (id, name, color) => {
-					const dom = document.getElementById(id);
-					if (!dom) {
-						console.error(`找不到图表容器: ${id}`);
-						return null;
+						tooltip: {
+							showBox: true,
+							showArrow: true,
+							showCategory: true,
+							borderWidth: 0,
+							borderRadius: 4,
+							borderColor: '#000000',
+							borderOpacity: 0.7,
+							bgColor: '#000000',
+							bgOpacity: 0.7,
+							gridType: 'solid',
+							gridColor: '#CCCCCC',
+							gridOpacity: 0.3,
+							fontColor: '#FFFFFF',
+							horizentalLine: true,
+							xAxisLabel: true,
+							yAxisLabel: true,
+							labelBgColor: '#FFFFFF',
+							labelBgOpacity: 0.7,
+							labelFontColor: '#666666'
+						}
 					}
-					
-					const chart = echarts.init(dom, null, {
-						renderer: 'canvas',
-						useDirtyRect: false,
-						devicePixelRatio: window.devicePixelRatio
-					});
-					
-					chart.setOption({
-						...chartConfig,
-						series: [{
-							...chartConfig.series[0],
-							name: name,
-							itemStyle: {
-								color: color,
-								borderColor: '#fff',
-								borderWidth: 1
-							},
-							areaStyle: {
-								...chartConfig.series[0].areaStyle,
-								color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
-									offset: 0,
-									color: color.replace(')', ', 0.2)').replace('rgb', 'rgba')
-								}, {
-									offset: 1,
-									color: color.replace(')', ', 0.05)').replace('rgb', 'rgba')
-								}])
-							}
-						}]
-					});
-					
-					return chart;
+				},
+				temperatureOptions: null,
+				heartRateOptions: null,
+				bloodOxygenOptions: null,
+				snoreOptions: null,
+				isNetworkCollapsed: true, // 默认折叠状态
+	  };
+	},
+	onLoad() {
+	  this.loadData();
+	},
+	methods: {
+			// 生成时间点数据
+			generateTimePoints() {
+				const points = [];
+				const now = new Date();
+				now.setHours(0, 0, 0, 0);
+				
+				for (let i = 0; i < 24; i++) {
+					const hour = i.toString().padStart(2, '0');
+					points.push(`${hour}:00`);
+				}
+				return points;
+			},
+
+			// 计算数据的最大最小值
+			calculateDataRange(data) {
+				const values = data.map(item => typeof item === 'object' ? item.value : item);
+				const max = Math.max(...values);
+				const min = Math.min(...values);
+				// 添加一些边距，使图表显示更美观
+				const padding = (max - min) * 0.1;
+				return {
+					min: Math.floor((min - padding) * 10) / 10,
+					max: Math.ceil((max + padding) * 10) / 10
+				};
+			},
+
+			// 生成模拟数据
+			generateData() {
+				const categories = this.generateTimePoints();
+				
+				// 生成心率数据
+				const heartRateData = Array(24).fill(0).map(() => {
+					const baseValue = 75;
+					const randomValue = Math.random() * 20 - 10;
+					return Number((baseValue + randomValue).toFixed(1));
+				});
+				
+				// 生成血氧数据
+				const bloodOxygenData = Array(24).fill(0).map(() => {
+					const baseValue = 98;
+					const randomValue = Math.random() * 2 - 1;
+					return Number((baseValue + randomValue).toFixed(1));
+				});
+				
+				// 生成体温数据
+				const temperatureData = Array(24).fill(0).map(() => {
+					const baseValue = 36.5;
+					const randomValue = Math.random() * 0.3 - 0.15;
+					return Number((baseValue + randomValue).toFixed(1));
+				});
+				
+				// 生成打鼾数据（噪声数据）
+				const snoreData = Array(24).fill(0).map(() => {
+					const baseValue = 30;
+					const randomValue = Math.random() * 40;
+					return Number((baseValue + randomValue).toFixed(1));
+				});
+				
+				// 计算每个数据集的范围
+				const heartRateRange = this.calculateDataRange(heartRateData);
+				const bloodOxygenRange = this.calculateDataRange(bloodOxygenData);
+				const temperatureRange = this.calculateDataRange(temperatureData);
+				const snoreRange = this.calculateDataRange(snoreData);
+				
+				// 更新图表数据
+				this.heartRateData = {
+					categories,
+					series: [{
+						name: '心率',
+						data: heartRateData,
+						type: 'line',
+						style: 'curve',
+						color: '#FF4D4F'
+					}]
 				};
 				
-				this.charts.heartRate = initChart('heartRateChart', '心率', '#1890FF');
-				this.charts.breathingRate = initChart('breathingRateChart', '呼吸', '#91CB74');
-				this.charts.temperature = initChart('temperatureChart', '体温', '#FAC858');
-				this.charts.snore = initChart('snoreChart', '鼾声', '#EE6666');
-				
-				// 监听窗口大小变化
-				window.addEventListener('resize', this.resizeCharts);
-			},
-			
-			updateCharts() {
-				Object.entries(this.charts).forEach(([type, chart]) => {
-					if (!chart) return;
-					
-					chart.setOption({
-						xAxis: {
-							data: this.chartData[type].times
-						},
-						series: [{
-							data: this.chartData[type].values
-						}]
-					});
-				});
-			},
-			
-			resizeCharts() {
-				Object.values(this.charts).forEach(chart => {
-					chart && chart.resize();
-				});
-			},
-			
-			handleRecordingComplete(recording) {
-				console.log('录音完成:', recording);
-				this.lastRecording = recording;
-			},
-			
-			// 添加新数据点（不再更新范围）
-			addNewData(type, value) {
-				// 更新图表数据
-				const now = new Date();
-				const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-				
-				this.chartData[type].times.push(time);
-				this.chartData[type].values.push(value);
-				
-				// 保持最近24小时的数据
-				if (this.chartData[type].times.length > this.totalHours) {
-					this.chartData[type].times.shift();
-					this.chartData[type].values.shift();
-				}
-				
-				// 更新图表（使用固定的范围）
-				this.charts[type].setOption({
-					xAxis: {
-						data: this.chartData[type].times
-					},
+				this.bloodOxygenData = {
+					categories,
 					series: [{
-						data: this.chartData[type].values
+						name: '血氧',
+						data: bloodOxygenData,
+						type: 'line',
+						style: 'curve',
+						color: '#69C0FF'
 					}]
+				};
+				
+				this.temperatureData = {
+					categories,
+					series: [{
+						name: '体温',
+						data: temperatureData,
+						type: 'line',
+						style: 'curve',
+						color: '#FFA940'
+					}]
+				};
+				
+				this.snoreData = {
+					categories,
+					series: [{
+						name: '鼾声',
+						data: snoreData,
+						type: 'line',
+						style: 'curve',
+						color: '#9254DE'
+					}]
+				};
+				
+				// 更新图表配置
+				this.heartRateOptions = this.createChartOptions({
+					name: '心率',
+					data: heartRateData,
+					range: heartRateRange
+				});
+				
+				this.bloodOxygenOptions = this.createChartOptions({
+					name: '血氧',
+					data: bloodOxygenData,
+					range: bloodOxygenRange
+				});
+				
+				this.temperatureOptions = this.createChartOptions({
+					name: '体温',
+					data: temperatureData,
+					range: temperatureRange
+				}, 0.1);
+				
+				this.snoreOptions = this.createChartOptions({
+					name: '鼾声',
+					data: snoreData,
+					range: snoreRange
 				});
 			},
-			formatTime(timestamp) {
-				const date = new Date(timestamp);
-				return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+			// 加载数据
+			loadData() {
+				try {
+					const data = this.generateData();
+					
+					// 为每个图表创建配置
+					const createChartOptions = (series, gridEval = 1) => {
+						const options = {
+							...this.chartOpts,
+							xAxis: {
+								...this.chartOpts.xAxis,
+								// 确保x轴标签显示完整
+								labelCount: 8,
+								itemCount: 24,
+								format: (val) => val,
+								// 添加标签旋转，防止文字重叠
+								rotateLabel: true,
+								rotate: 45,
+								// 调整标签位置
+								labelMargin: 10
+							},
+							yAxis: {
+								disabled: false,
+								disableGrid: false,
+								splitNumber: 5,
+								gridType: 'dash',
+								gridColor: 'rgba(204,204,204,0.3)',
+								dashLength: 2,
+								gridEval,
+								min: series.range.min,
+								max: series.range.max,
+								format: (val) => {
+									return val.toFixed(1);
+								}
+							}
+						};
+						
+						// 根据主题设置颜色
+						if (this.isDarkTheme) {
+							options.xAxis.axisLineColor = '#FFFFFF';
+							options.xAxis.axisGridColor = '#FFFFFF';
+							options.xAxis.gridColor = '#FFFFFF';
+							options.fontColor = '#FFFFFF';
+						}
+						
+						return options;
+					};
+					
+					// 为体温图表创建特殊的配置
+					this.temperatureOptions = createChartOptions(data.series[2], 0.1);
+					
+					// 为其他图表创建配置
+					this.heartRateOptions = createChartOptions(data.series[0]);
+					this.bloodOxygenOptions = createChartOptions(data.series[1]);
+					this.snoreOptions = createChartOptions(data.series[3]);
+					
+					// 设置图表数据
+					this.heartRateData = {
+						categories: data.categories,
+						series: [{
+							name: '心率',
+							data: data.series[0].data,
+							type: 'line',
+							style: 'curve',
+							color: '#FF4D4F'
+						}]
+					};
+					
+					this.bloodOxygenData = {
+						categories: data.categories,
+						series: [{
+							name: '血氧',
+							data: data.series[1].data,
+							type: 'line',
+							style: 'curve',
+							color: '#69C0FF'
+						}]
+					};
+					
+					this.temperatureData = {
+						categories: data.categories,
+						series: [{
+							name: '体温',
+							data: data.series[2].data,
+							type: 'line',
+							style: 'curve',
+							color: '#FFA940'
+						}]
+					};
+					
+					this.snoreData = {
+						categories: data.categories,
+						series: [{
+							name: '打鼾',
+							data: data.series[3].data,
+							type: 'line',
+							style: 'curve',
+							color: '#9254DE'
+						}]
+					};
+				} catch (error) {
+					this.logError('数据加载失败', error);
+				}
 			},
-			goBack() {
-				uni.navigateBack({
-					delta: 1
+
+			// 图表初始化完成
+			onChartInited(chartId) {
+				console.log(`${chartId} 图表初始化完成`);
+			},
+
+			// 图表错误处理
+			onChartError(chartId, error) {
+				this.logError(`${chartId}图表错误`, error);
+			},
+
+			// 刷新图表数据
+			refreshChartData() {
+				this.loadData();
+			},
+
+			// 切换主题
+			toggleTheme() {
+				this.isDarkTheme = !this.isDarkTheme;
+				this.chartOpts.fontColor = this.isDarkTheme ? '#FFFFFF' : '#666666';
+				this.chartOpts.xAxis.axisLineColor = this.isDarkTheme ? '#FFFFFF' : '#CCCCCC';
+				this.chartOpts.xAxis.axisGridColor = this.isDarkTheme ? '#FFFFFF' : '#CCCCCC';
+				this.chartOpts.xAxis.gridColor = this.isDarkTheme ? '#FFFFFF' : '#CCCCCC';
+				this.refreshChartData();
+	  },
+
+			// 切换错误面板
+			toggleErrorPanel() {
+				this.showErrorPanel = !this.showErrorPanel;
+			},
+
+			// 清除错误日志
+			clearErrors() {
+				this.errorLogs = [];
+				this.hasErrors = false;
+				this.errorCount = 0;
+			},
+
+			// 记录错误
+			logError(message, error) {
+				const errorLog = {
+					timestamp: new Date(),
+					message,
+					details: error?.message || error?.toString() || '',
+					type: 'error'
+				};
+				this.errorLogs.unshift(errorLog);
+				this.hasErrors = true;
+				this.errorCount = this.errorLogs.length;
+			},
+
+			// 格式化时间
+			formatTime(date) {
+				return new Date(date).toLocaleTimeString('zh-CN', {
+					hour: '2-digit',
+					minute: '2-digit',
+					second: '2-digit',
+					hour12: false
+		});
+	  },
+
+			onTouchStart(e) {
+				console.log('touch start', e);
+			},
+			onTouchMove(e) {
+				console.log('touch move', e);
+	  },
+			onTouchEnd(e) {
+				console.log('touch end', e);
+			},
+
+			// 添加处理网络数据更新的方法
+			handleDataUpdated(chartData) {
+				try {
+					// 更新心率数据
+					this.heartRateData = {
+						categories: chartData.timePoints,
+						series: [{
+							name: '心率',
+							data: chartData.heartRate,
+							type: 'line',
+							style: 'curve',
+							color: '#FF4D4F'
+						}]
+					};
+					
+					// 更新体温数据
+					this.temperatureData = {
+						categories: chartData.timePoints,
+						series: [{
+							name: '体温',
+							data: chartData.temperature,
+							type: 'line',
+							style: 'curve',
+							color: '#FFA940'
+						}]
+					};
+					
+					// 更新血氧数据
+					this.bloodOxygenData = {
+						categories: chartData.timePoints,
+						series: [{
+							name: '血氧',
+							data: chartData.bloodOxygen,
+							type: 'line',
+							style: 'curve',
+							color: '#69C0FF'
+						}]
+					};
+					
+					// 更新图表配置
+					this.updateChartOptions();
+					
+				} catch (error) {
+					this.logError('更新图表数据失败', error);
+				}
+			},
+			
+			// 更新图表配置
+			updateChartOptions() {
+				// 计算每个数据集的范围
+				const heartRateRange = this.calculateDataRange(this.heartRateData.series[0].data);
+				const temperatureRange = this.calculateDataRange(this.temperatureData.series[0].data);
+				const bloodOxygenRange = this.calculateDataRange(this.bloodOxygenData.series[0].data);
+				const snoreRange = this.calculateDataRange(this.snoreData.series[0].data);
+				
+				// 更新心率图表配置
+				this.heartRateOptions = this.createChartOptions({
+					name: '心率',
+					data: this.heartRateData.series[0].data,
+					range: heartRateRange
 				});
+				
+				// 更新体温图表配置
+				this.temperatureOptions = this.createChartOptions({
+					name: '体温',
+					data: this.temperatureData.series[0].data,
+					range: temperatureRange
+				}, 0.1); // 体温使用0.1的刻度
+				
+				// 更新血氧图表配置
+				this.bloodOxygenOptions = this.createChartOptions({
+					name: '血氧',
+					data: this.bloodOxygenData.series[0].data,
+					range: bloodOxygenRange
+				});
+				
+				// 更新鼾声图表配置
+				this.snoreOptions = this.createChartOptions({
+					name: '鼾声',
+					data: this.snoreData.series[0].data,
+					range: snoreRange
+				});
+			},
+			
+			// 修改生成数据的方法
+			generateData() {
+				// 如果没有网络数据，才使用模拟数据
+				if (!this.heartRateData.series[0].data.length) {
+					const categories = this.generateTimePoints();
+					
+					// 生成心率数据
+					const heartRateData = Array(24).fill(0).map(() => {
+						const baseValue = 75;
+						const randomValue = Math.random() * 20 - 10;
+						return Number((baseValue + randomValue).toFixed(1));
+					});
+					
+					// 生成血氧数据
+					const bloodOxygenData = Array(24).fill(0).map(() => {
+						const baseValue = 98;
+						const randomValue = Math.random() * 2 - 1;
+						return Number((baseValue + randomValue).toFixed(1));
+					});
+					
+					// 生成体温数据
+					const temperatureData = Array(24).fill(0).map(() => {
+						const baseValue = 36.5;
+						const randomValue = Math.random() * 0.3 - 0.15;
+						return Number((baseValue + randomValue).toFixed(1));
+					});
+					
+					// 生成打鼾数据（噪声数据）
+					const snoreData = Array(24).fill(0).map(() => {
+						const baseValue = 30;
+						const randomValue = Math.random() * 40;
+						return Number((baseValue + randomValue).toFixed(1));
+					});
+					
+					// 计算每个数据集的范围
+					const heartRateRange = this.calculateDataRange(heartRateData);
+					const bloodOxygenRange = this.calculateDataRange(bloodOxygenData);
+					const temperatureRange = this.calculateDataRange(temperatureData);
+					const snoreRange = this.calculateDataRange(snoreData);
+					
+					// 更新图表数据
+					this.heartRateData = {
+						categories,
+						series: [{
+							name: '心率',
+							data: heartRateData,
+							type: 'line',
+							style: 'curve',
+							color: '#FF4D4F'
+						}]
+					};
+					
+					this.bloodOxygenData = {
+						categories,
+						series: [{
+							name: '血氧',
+							data: bloodOxygenData,
+							type: 'line',
+							style: 'curve',
+							color: '#69C0FF'
+						}]
+					};
+					
+					this.temperatureData = {
+						categories,
+						series: [{
+							name: '体温',
+							data: temperatureData,
+							type: 'line',
+							style: 'curve',
+							color: '#FFA940'
+						}]
+					};
+					
+					this.snoreData = {
+						categories,
+						series: [{
+							name: '鼾声',
+							data: snoreData,
+							type: 'line',
+							style: 'curve',
+							color: '#9254DE'
+						}]
+					};
+					
+					// 更新图表配置
+					this.heartRateOptions = this.createChartOptions({
+						name: '心率',
+						data: heartRateData,
+						range: heartRateRange
+					});
+					
+					this.bloodOxygenOptions = this.createChartOptions({
+						name: '血氧',
+						data: bloodOxygenData,
+						range: bloodOxygenRange
+					});
+					
+					this.temperatureOptions = this.createChartOptions({
+						name: '体温',
+						data: temperatureData,
+						range: temperatureRange
+					}, 0.1);
+					
+					this.snoreOptions = this.createChartOptions({
+						name: '鼾声',
+						data: snoreData,
+						range: snoreRange
+					});
+				}
+			},
+
+			// 添加导航到网络测试页面的方法
+			goToNetworkTest() {
+				uni.navigateTo({
+					url: '/pages/test/network-test'
+				});
+			},
+
+			toggleNetworkSection() {
+				this.isNetworkCollapsed = !this.isNetworkCollapsed;
+			},
+			
+			handleNetworkData(data) {
+				console.log('收到网络数据:', data);
+				// 这里可以处理网络监控组件传来的数据
 			}
-		},
-		onUnload() {
-			// 清理定时器
-			if (this.timer) {
-				clearInterval(this.timer);
-			}
-			// 页面卸载时移除事件监听
-			window.removeEventListener('resize', this.resizeCharts);
-			// 销毁图表实例
-			Object.values(this.charts).forEach(chart => {
-				chart && chart.dispose();
-			});
 		}
 	}
-</script>
-
-<style>
-	.sleep-container {
-		min-height: 100vh;
-		background-color: #f8f8f8;
-		padding: 0;
-		box-sizing: border-box;
-		transition: background-color 0.3s ease;
-	}
+  </script>
+  
+<style lang="scss">
+  .sleep-container {
+	min-height: 100vh;
+	background-color: #f5f5f5;
+	padding: 20rpx;
+	box-sizing: border-box;
 	
-	.sleep-container.dark-theme {
+	&.dark-theme {
 		background-color: #1a1a1a;
-	}
-	
-	.page-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 20rpx 30rpx;
-		background-color: #ffffff;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
-	}
-	
-	.dark-theme .page-header {
-		background-color: #2c2c2c;
-		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
-	}
-	
-	.page-title {
-		font-size: 36rpx;
-		font-weight: bold;
-		color: #333;
-	}
-	
-	.dark-theme .page-title {
 		color: #ffffff;
+  }
+}
+
+  .page-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 30rpx;
+	
+  .page-title {
+	font-size: 36rpx;
+	font-weight: bold;
 	}
 	
-	.theme-switch {
-		width: 80rpx;
-		height: 80rpx;
+	.header-actions {
+		display: flex;
+		gap: 20rpx;
+		
+		.action-button {
+ width: 80rpx;
+ height: 80rpx;
+			border-radius: 50%;
+			background-color: #ffffff;
+ display: flex;
+	align-items: center;
+	justify-content: center;
+			box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+			
+			.action-icon {
+				font-size: 40rpx;
+			}
+			
+			&:active {
+				transform: scale(0.95);
+			}
+		}
+	}
+}
+
+.dark-theme .header-actions .action-button {
+	background-color: #2a2a2a;
+	box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.2);
+}
+
+.chart-section {
+	display: flex;
+	flex-direction: column;
+	gap: 30rpx;
+	
+	.chart-card {
+		background-color: #ffffff;
+		border-radius: 20rpx;
+		padding: 30rpx;
+		box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+		
+		.chart-title {
+			font-size: 32rpx;
+			font-weight: bold;
+			margin-bottom: 20rpx;
+			
+			&.heart-rate {
+				color: #FF4D4F;
+			}
+			
+			&.blood-oxygen {
+				color: #69C0FF;
+			}
+			
+			&.temperature {
+				color: #FFA940;
+			}
+			
+			&.snore {
+				color: #9254DE;
+			}
+		}
+		
+		.chart-box {
+			width: 100%;
+			height: 400rpx;
+			position: relative;
+			overflow: hidden;
+			touch-action: pan-x;
+			background: transparent;
+			
+			:deep(.qiun-charts) {
+ position: relative;
+				touch-action: pan-x;
+				-webkit-tap-highlight-color: transparent;
+				user-select: none;
+				-webkit-user-select: none;
+				cursor: grab;
+				
+				&:active {
+					cursor: grabbing;
+  }
+			}
+			
+			:deep(canvas) {
+				touch-action: pan-x;
+  }
+		}
+	}
+}
+
+.error-panel {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 80%;
+	max-height: 80vh;
+	background-color: #ffffff;
+	border-radius: 20rpx;
+	box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.2);
+	z-index: 1000;
+	
+	&.dark-theme {
+		background-color: #2a2a2a;
+		color: #ffffff;
+  }
+	
+	.error-header {
+ display: flex;
+	justify-content: space-between;
+	align-items: center;
+	 padding: 20rpx 30rpx;
+		border-bottom: 2rpx solid #eeeeee;
+		
+		.error-title {
+ font-size: 32rpx;
+ font-weight: bold;
+  }
+		
+		.error-actions {
+			display: flex;
+			gap: 20rpx;
+			
+			.error-action {
+				width: 60rpx;
+				height: 60rpx;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				
+				.action-icon {
+	font-size: 32rpx;
+  }
+			}
+		}
+	}
+	
+	.error-content {
+		padding: 20rpx 30rpx;
+		max-height: calc(80vh - 100rpx);
+		
+		.error-item {
+			margin-bottom: 20rpx;
+			padding: 20rpx;
+			border-radius: 10rpx;
+			background-color: #f8f8f8;
+			
+			&.error {
+				background-color: #fff2f0;
+				border: 2rpx solid #ffccc7;
+			}
+			
+			&.warning {
+				background-color: #fffbe6;
+				border: 2rpx solid #ffe58f;
+  }
+			
+			&.info {
+				background-color: #e6f7ff;
+				border: 2rpx solid #91d5ff;
+			}
+			
+			.error-time {
+ font-size: 24rpx;
+				color: #999999;
+				margin-bottom: 10rpx;
+  }
+			
+			.error-message {
+ font-size: 28rpx;
+				color: #333333;
+				margin-bottom: 10rpx;
+  }
+			
+			.error-details {
+	font-size: 24rpx;
+				color: #666666;
+				word-break: break-all;
+  }
+		}
+	}
+}
+
+.debug-button {
+	position: fixed;
+	right: 30rpx;
+	bottom: 30rpx;
+	width: 100rpx;
+	height: 100rpx;
+	background-color: #ff4d4f;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 4rpx 12rpx rgba(255, 77, 79, 0.3);
+	z-index: 999;
+	
+	.debug-icon {
+		font-size: 48rpx;
+	}
+	
+	.debug-count {
+		position: absolute;
+		top: -10rpx;
+		right: -10rpx;
+		min-width: 40rpx;
+		height: 40rpx;
+		padding: 0 10rpx;
+		background-color: #ffffff;
+		border-radius: 20rpx;
+		font-size: 24rpx;
+		color: #ff4d4f;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background-color: #f5f5f5;
-		border-radius: 50%;
-		cursor: pointer;
-		transition: background-color 0.3s ease;
+		box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.1);
+  }
+}
+
+.dark-theme {
+	.chart-card {
+		background-color: #2a2a2a;
+		
+  .chart-title {
+			color: #ffffff;
+		}
 	}
 	
-	.dark-theme .theme-switch {
-		background-color: #3a3a3a;
-	}
-	
-	.theme-icon {
-		font-size: 40rpx;
-	}
-	
-	.page-content {
-		display: flex;
-		flex-direction: column;
-		padding: 30rpx;
-		padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
-	}
-	
-	/* 顶部状态卡片样式 */
-	.status-card {
-		margin-top: calc(88rpx + var(--status-bar-height));
-		margin-left: 30rpx;
-		margin-right: 30rpx;
-		margin-bottom: 30rpx;
-		background: linear-gradient(135deg, #007AFF, #0056b3);
-		border-radius: 24rpx;
-		padding: 30rpx;
-		color: #fff;
-		box-shadow: 0 4rpx 20rpx rgba(0,122,255,0.2);
-		transition: box-shadow 0.3s ease;
-	}
-	
-	.dark-theme .status-card {
-		box-shadow: 0 4rpx 20rpx rgba(0,122,255,0.3);
-	}
-	
-	.status-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 30rpx;
-	}
-	
-	.status-title {
-		font-size: 32rpx;
-		font-weight: 600;
-	}
-	
-	.status-time {
-		font-size: 28rpx;
-		opacity: 0.8;
-	}
-	
-	.status-content {
-		display: flex;
-		justify-content: space-between;
-	}
-	
-	.status-item {
-		text-align: center;
-		flex: 1;
-	}
-	
-	.status-label {
-		font-size: 24rpx;
-		opacity: 0.8;
-		display: block;
-		margin-bottom: 10rpx;
-	}
-	
-	.status-value {
-		font-size: 36rpx;
-		font-weight: 600;
-	}
-	
-	/* 数据图表区域样式 */
-	.charts-container {
-		padding: 0 30rpx;
-		padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
-		display: flex;
-		flex-direction: column;
-		margin-bottom: 30rpx;
-	}
-	
-	.chart-item {
-		background-color: #fff;
-		border-radius: 24rpx;
-		padding: 15rpx 30rpx;
-		box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
-		transition: all 0.3s ease;
-	}
-	
-	.dark-theme .chart-item {
-		background-color: #2c2c2c;
-		box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.2);
-	}
-	
-	.chart-item:active {
-		transform: scale(0.98);
-	}
-	
-	.chart-title {
-		display: block;
-		font-size: 28rpx;
-		color: #666;
-		margin-bottom: 20rpx;
-		font-weight: 500;
-	}
-	
-	.dark-theme .chart-title {
-		color: #999;
-	}
-	
-	.chart-box {
-		width: 100%;
-		height: 35vw;
-		max-height: 350rpx;
-		min-height: 280rpx;
-		position: relative;
-	}
-	
-	.echarts {
-		width: 100%;
-		height: 100%;
-		cursor: grab;
-		touch-action: pan-x pan-y;
-		-webkit-tap-highlight-color: transparent;
-		user-select: none;
-		-webkit-user-select: none;
-	}
-	
-	.echarts:active {
-		cursor: grabbing;
-	}
-	
-	.recorder-section {
-		margin: 30rpx 0;
-		display: flex;
-		flex-direction: column;
-		margin-bottom: 30rpx;
-	}
-	
-	.snore-chart {
-		margin-bottom: 0;
-	}
-	
-	.snore-chart .chart-box {
-		height: 30vw;
-		max-height: 300rpx;
-		min-height: 240rpx;
-	}
-	
-	/* 移除之前的深色模式媒体查询 */
-	@media (prefers-color-scheme: dark) {
-		.sleep-container {
-			background-color: #f8f8f8;
+	.error-item {
+		background-color: #333333 !important;
+		
+		.error-time {
+			color: #999999;
+  }
+		
+		.error-message {
+ color: #ffffff;
+  }
+		
+		.error-details {
+			color: #cccccc;
 		}
 		
-		.chart-item {
-			background-color: #fff;
-			box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
+		&.error {
+			background-color: #3a1a1a !important;
+			border-color: #4a2a2a !important;
 		}
 		
-		.chart-title {
-			color: #666;
+		&.warning {
+			background-color: #3a3a1a !important;
+			border-color: #4a4a2a !important;
+		}
+		
+		&.info {
+			background-color: #1a3a4a !important;
+			border-color: #2a4a5a !important;
 		}
 	}
-</style> 
+  }
+
+.network-monitor-section {
+	margin-bottom: 30rpx;
+}
+
+.network-section {
+	margin: 20rpx;
+	background-color: #fff;
+	border-radius: 12rpx;
+	box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+	overflow: hidden;
+	transition: all 0.3s ease;
+}
+
+.network-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 20rpx;
+	background-color: #f5f5f5;
+	cursor: pointer;
+}
+
+.network-title {
+	font-size: 28rpx;
+	font-weight: 500;
+	color: #333;
+}
+
+.collapse-icon {
+	font-size: 24rpx;
+	color: #666;
+	transition: transform 0.3s ease;
+}
+
+.network-content {
+	padding: 20rpx;
+	transition: all 0.3s ease;
+}
+
+.monitor-component {
+	width: 100%;
+}
+
+/* 深色主题样式 */
+.dark-theme .network-section {
+	background-color: #1c1c1c;
+	box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.2);
+}
+
+.dark-theme .network-header {
+	background-color: #2c2c2c;
+}
+
+.dark-theme .network-title {
+	color: #fff;
+}
+
+.dark-theme .collapse-icon {
+	color: #999;
+}
+
+/* 折叠状态样式 */
+.network-section.collapsed .network-content {
+	display: none;
+}
+
+.network-section.collapsed .network-header {
+	border-bottom: none;
+}
+
+/* 确保图表容器有合适的底部间距 */
+.charts-container {
+	margin-bottom: 20rpx;
+  }
+  </style>

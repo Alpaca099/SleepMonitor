@@ -57,7 +57,13 @@
           "<uses-permission android:name=\"android.permission.WAKE_LOCK\"/>",
           "<uses-permission android:name=\"android.permission.FLASHLIGHT\"/>",
           "<uses-feature android:name=\"android.hardware.camera\"/>",
-          "<uses-permission android:name=\"android.permission.WRITE_SETTINGS\"/>"
+          "<uses-permission android:name=\"android.permission.WRITE_SETTINGS\"/>",
+          "<uses-permission android:name=\"android.permission.RECORD_AUDIO\"/>",
+          "<uses-permission android:name=\"android.permission.READ_MEDIA_AUDIO\"/>",
+          "<uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\"/>",
+          "<uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\"/>",
+          "<uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\"/>",
+          "<uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\"/>"
         ]
       },
       "apple": {
@@ -131,7 +137,7 @@
         },
         {
           "pagePath": "pages/profile/index",
-          "text": "我的",
+          "text": "我的我的",
           "iconPath": "/static/tabbar/profile.png",
           "selectedIconPath": "/static/tabbar/profile-active.png"
         }

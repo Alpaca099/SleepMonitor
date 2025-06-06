@@ -27,6 +27,13 @@
 				"navigationBarTitleText": "我的",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/test/network-test",
+			"style": {
+				"navigationBarTitleText": "网络监控测试",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {
@@ -61,10 +68,16 @@
 			},
 			{
 				"pagePath": "pages/profile/index",
-				"text": "我的我的",
+				"text": "我的",
 				"iconPath": "static/tabbar/profile.png",
 				"selectedIconPath": "static/tabbar/profile-active.png"
 			}
 		]
+	},
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^qiun-data-charts": "@/uni_modules/qiun-data-charts/components/qiun-data-charts/qiun-data-charts"
+		}
 	}
 }

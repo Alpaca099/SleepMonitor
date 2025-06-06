@@ -1,19 +1,42 @@
 <template>
-	<view class="recorder-page" :class="{ 'dark-theme': isDarkTheme }">
-		<view class="page-header">
-			<text class="page-title">睡眠信息</text>
-			<view class="theme-switch" @tap="toggleTheme">
-				<text class="theme-icon">{{ isDarkTheme ? '🌞' : '🌙' }}</text>
+	<view class="recorder-container" :class="{ 'dark-theme': isDarkTheme }">
+		<view class="recorder-header">
+			<text class="recorder-title">睡眠录音</text>
+			<view class="header-actions">
+				<button class="action-button" @tap="toggleTheme">
+					{{ isDarkTheme ? '🌙' : '☀️' }}
+				</button>
 			</view>
 		</view>
 		
-		<view class="page-content">
+		<view class="recorder-content">
+			<!-- 鼾声数据图表 -->
+			<view class="snore-chart-section">
+				<view class="chart-header">
+					<text class="chart-title">鼾声数据</text>
+					<view class="chart-actions">
+						<button class="refresh-button" @tap="refreshSnoreData">
+							<text class="refresh-icon">🔄</text>
+						</button>
+					</view>
+				</view>
+				<view class="chart-container">
+					<qiun-data-charts 
+						type="line"
+						:opts="snoreChartOpts"
+						:chartData="snoreChartData"
+						:ontouch="true"
+						:canvas2d="true"
+					/>
+				</view>
+			</view>
+			
 			<!-- 录音组件 -->
 			<view class="recorder-section">
 				<audio-recorder 
 					@recording-complete="handleRecordingComplete" 
 					@recording-error="handleRecordingError"
-					:is-dark-theme="isDarkTheme"
+					:isDarkTheme="isDarkTheme"
 				/>
 			</view>
 			
@@ -69,50 +92,7 @@
 		data() {
 			return {
 				isDarkTheme: false,
-				recordings: [
-					{
-						timestamp: Date.now() - 3600000 * 2, // 2小时前
-						duration: 7200, // 2小时
-						size: 1024 * 1024 * 2, // 2MB
-						snoreData: {
-							count: 45,
-							details: [
-								{ time: 1200, intensity: 65, duration: 3 },
-								{ time: 1800, intensity: 70, duration: 2 },
-								{ time: 2400, intensity: 68, duration: 4 }
-							],
-							averageIntensity: 67.5
-						}
-					},
-					{
-						timestamp: Date.now() - 3600000 * 24, // 1天前
-						duration: 3600, // 1小时
-						size: 1024 * 1024, // 1MB
-						snoreData: {
-							count: 25,
-							details: [
-								{ time: 600, intensity: 62, duration: 2 },
-								{ time: 1200, intensity: 68, duration: 3 },
-								{ time: 1800, intensity: 65, duration: 2 }
-							],
-							averageIntensity: 65.0
-						}
-					},
-					{
-						timestamp: Date.now() - 3600000 * 48, // 2天前
-						duration: 5400, // 1.5小时
-						size: 1024 * 1024 * 1.5, // 1.5MB
-						snoreData: {
-							count: 35,
-							details: [
-								{ time: 900, intensity: 70, duration: 3 },
-								{ time: 1800, intensity: 65, duration: 2 },
-								{ time: 2700, intensity: 72, duration: 4 }
-							],
-							averageIntensity: 69.0
-						}
-					}
-				],
+				recordings: [],
 				audioContext: null,
 				maxDisplayRecords: 5,
 				mockData: {
@@ -128,6 +108,45 @@
 						min: 1,
 						max: 5
 					}
+				},
+				snoreChartData: {
+					categories: [],
+					series: [{
+						name: "鼾声",
+						data: []
+					}]
+				},
+				snoreChartOpts: {
+					color: ["#1890FF"],
+					padding: [15, 15, 0, 15],
+					legend: {
+						show: false
+					},
+					xAxis: {
+						disableGrid: true,
+						itemCount: 24,
+						labelCount: 8,
+						rotateLabel: true,
+						rotate: 45,
+						format: (val) => {
+							return val;
+						}
+					},
+					yAxis: {
+						gridType: "dash",
+						dashLength: 2,
+						splitNumber: 5,
+						format: (val) => {
+							return val.toFixed(0);
+						}
+					},
+					extra: {
+						line: {
+							type: "curve",
+							width: 2,
+							activeType: "hollow"
+						}
+					}
 				}
 			}
 		},
@@ -140,6 +159,9 @@
 			this.audioContext = uni.createInnerAudioContext();
 			// 加载历史录音
 			this.loadRecordings();
+			
+			// 初始化图表数据
+			this.initSnoreChartData();
 		},
 		methods: {
 			// 加载录音记录
@@ -284,6 +306,52 @@
 			toggleTheme() {
 				this.isDarkTheme = !this.isDarkTheme;
 				uni.setStorageSync('theme', this.isDarkTheme ? 'dark' : 'light');
+				
+				// 更新图表主题
+				this.updateChartTheme();
+			},
+			
+			initSnoreChartData() {
+				// 生成24小时的时间点
+				const timePoints = Array.from({length: 24}, (_, i) => {
+					return `${i.toString().padStart(2, '0')}:00`;
+				});
+				
+				// 生成模拟数据
+				const snoreData = Array.from({length: 24}, () => {
+					return Math.floor(Math.random() * 100);
+				});
+				
+				this.snoreChartData = {
+					categories: timePoints,
+					series: [{
+						name: "鼾声",
+						data: snoreData
+					}]
+				};
+				
+				// 设置Y轴范围
+				this.snoreChartOpts.yAxis.min = 0;
+				this.snoreChartOpts.yAxis.max = 100;
+			},
+			
+			refreshSnoreData() {
+				// 重新生成数据
+				this.initSnoreChartData();
+				
+				uni.showToast({
+					title: '数据已更新',
+					icon: 'none',
+					duration: 2000
+				});
+			},
+			
+			updateChartTheme() {
+				// 更新图表主题颜色
+				this.snoreChartOpts.color = [this.isDarkTheme ? '#0A84FF' : '#1890FF'];
+				this.snoreChartOpts.xAxis.color = this.isDarkTheme ? '#666' : '#333';
+				this.snoreChartOpts.yAxis.color = this.isDarkTheme ? '#666' : '#333';
+				this.snoreChartOpts.yAxis.gridColor = this.isDarkTheme ? '#333' : '#eee';
 			}
 		},
 		onUnload() {
@@ -297,7 +365,7 @@
 </script>
 
 <style>
-	.recorder-page {
+	.recorder-container {
 		min-height: 100vh;
 		background-color: #f5f5f5;
 		transition: background-color 0.3s ease;
@@ -307,7 +375,7 @@
 		background-color: #1a1a1a;
 	}
 	
-	.page-header {
+	.recorder-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
@@ -316,22 +384,27 @@
 		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
 	}
 	
-	.dark-theme .page-header {
+	.dark-theme .recorder-header {
 		background-color: #2c2c2c;
 		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.2);
 	}
 	
-	.page-title {
+	.recorder-title {
 		font-size: 36rpx;
 		font-weight: bold;
 		color: #333;
 	}
 	
-	.dark-theme .page-title {
+	.dark-theme .recorder-title {
 		color: #ffffff;
 	}
 	
-	.theme-switch {
+	.header-actions {
+		display: flex;
+		gap: 10rpx;
+	}
+	
+	.action-button {
 		width: 80rpx;
 		height: 80rpx;
 		display: flex;
@@ -343,29 +416,110 @@
 		transition: background-color 0.3s ease;
 	}
 	
-	.dark-theme .theme-switch {
+	.dark-theme .action-button {
 		background-color: #3a3a3a;
 	}
 	
-	.theme-icon {
-		font-size: 40rpx;
-	}
-	
-	.page-content {
+	.recorder-content {
 		display: flex;
 		flex-direction: column;
 		margin-bottom: 30rpx;
+	}
+	
+	.snore-chart-section {
+		margin: 20rpx;
+		background-color: #fff;
+		border-radius: 12rpx;
+		box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.1);
+		overflow: hidden;
+	}
+	
+	.chart-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 20rpx;
+		border-bottom: 1px solid #eee;
+	}
+	
+	.chart-title {
+		font-size: 28rpx;
+		font-weight: 500;
+		color: #333;
+	}
+	
+	.chart-actions {
+		display: flex;
+		gap: 10rpx;
+	}
+	
+	.refresh-button {
+		width: 60rpx;
+		height: 60rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: none;
+		border: none;
+		padding: 0;
+	}
+	
+	.refresh-icon {
+		font-size: 32rpx;
+	}
+	
+	.chart-container {
+		width: 100%;
+		height: 400rpx;
+		padding: 20rpx;
+	}
+	
+	.dark-theme .snore-chart-section {
+		background-color: #1c1c1c;
+		box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.2);
+	}
+	
+	.dark-theme .chart-header {
+		border-bottom-color: #333;
+	}
+	
+	.dark-theme .chart-title {
+		color: #fff;
+	}
+	
+	.dark-theme .refresh-icon {
+		color: #fff;
 	}
 	
 	.recorder-section {
 		background-color: #fff;
 		border-radius: 20rpx;
 		padding: 30rpx;
+		margin: 20rpx;
 		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
+		width: auto;
+		display: inline-block;
+	}
+	
+	.recorder-section :deep(.audio-recorder) {
+		width: 100%;
+		display: inline-block;
+	}
+	
+	.recorder-section :deep(.recorder-container) {
+		width: 100%;
+		display: inline-block;
+		background-color: #f5f5f5;
+		border-radius: 12rpx;
+		padding: 20rpx;
+	}
+	
+	.dark-theme .recorder-section :deep(.recorder-container) {
+		background-color: #2c2c2c;
 	}
 	
 	.dark-theme .recorder-section {
-		background-color: #2c2c2c;
+		background-color: #1c1c1c;
 		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
 	}
 	
@@ -373,6 +527,7 @@
 		background-color: #fff;
 		border-radius: 20rpx;
 		padding: 30rpx;
+		margin: 20rpx;
 		box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.05);
 	}
 	

@@ -1,41 +1,39 @@
 <template>
-	<view class="recorder-container">
-		<view class="recorder-card" :class="{ 'dark-theme': isDarkTheme }">
-			<view class="recorder-header">
-				<text class="recorder-title">睡眠录音</text>
-				<text class="recorder-subtitle">记录睡眠时的声音</text>
+	<view class="recorder-card" :class="{ 'dark-theme': isDarkTheme }">
+		<view class="recorder-header">
+			<text class="recorder-title">睡眠录音</text>
+			<text class="recorder-subtitle">记录睡眠时的声音</text>
+		</view>
+		
+		<view class="recorder-controls">
+			<view class="recorder-status">
+				<view class="status-indicator" :class="{ 'recording': isRecording }">
+					<view class="status-dot"></view>
+				</view>
+				<text class="status-text">{{ isRecording ? '正在录音' : '未开始录音' }}</text>
 			</view>
 			
-			<view class="recorder-controls">
-				<view class="recorder-status">
-					<view class="status-indicator" :class="{ 'recording': isRecording }">
-						<view class="status-dot"></view>
+			<view class="recorder-button" 
+				:class="{ 'recording': isRecording }" 
+				@click="toggleRecording"
+			>
+				<view class="button-inner">
+					<view class="button-icon" :class="{ 'recording': isRecording }">
+						<view class="icon-circle"></view>
 					</view>
-					<text class="status-text">{{ isRecording ? '正在录音' : '未开始录音' }}</text>
-				</view>
-				
-				<view class="recorder-button" 
-					:class="{ 'recording': isRecording }" 
-					@click="toggleRecording"
-				>
-					<view class="button-inner">
-						<view class="button-icon" :class="{ 'recording': isRecording }">
-							<view class="icon-circle"></view>
-						</view>
-					</view>
-				</view>
-				
-				<view class="recorder-info" v-if="isRecording">
-					<text class="time-display">{{ formatTime(recordingDuration) }}</text>
-					<text class="size-display">{{ formatFileSize(currentSize) }}</text>
 				</view>
 			</view>
 			
-			<view class="recorder-tips">
-				<text class="tip-text">• 最长录音时间：5分钟</text>
-				<text class="tip-text">• 录音将自动保存</text>
-				<text class="tip-text">• 请确保麦克风权限已开启</text>
+			<view class="recorder-info" v-if="isRecording">
+				<text class="time-display">{{ formatTime(recordingDuration) }}</text>
+				<text class="size-display">{{ formatFileSize(currentSize) }}</text>
 			</view>
+		</view>
+		
+		<view class="recorder-tips">
+			<text class="tip-text">• 最长录音时间：10小时</text>
+			<text class="tip-text">• 录音将自动保存</text>
+			<text class="tip-text">• 请确保麦克风权限已开启</text>
 		</view>
 	</view>
 </template>
@@ -55,12 +53,12 @@
 				recordingDuration: 0,
 				durationTimer: null,
 				lastRecording: null,
-				maxDuration: 5 * 60 * 1000, // 最大录音时长5分钟
+				maxDuration: 10 * 60 * 60 * 1000, // 最大录音时长5分钟
 				mediaRecorder: null, // H5环境下的MediaRecorder实例
 				recorderManager: null, // 录音管理器实例
 				currentSize: 0, // 当前录音文件大小
 				options: {
-					duration: 300000, // 最长录音时间，单位ms
+					duration: 10 * 60 * 60 * 1000, // 最长录音时间，单位ms
 					sampleRate: 44100, // 采样率
 					numberOfChannels: 1, // 录音通道数
 					encodeBitRate: 192000, // 编码码率
@@ -114,7 +112,8 @@
 				clearInterval(this.durationTimer);
 			});
 
-			// 监听录音帧数据
+			// #ifdef APP-PLUS
+			// 只在 APP 环境下监听录音帧数据
 			this.recorderManager.onFrameRecorded((res) => {
 				const { frameBuffer, isLastFrame } = res;
 				if (frameBuffer && frameBuffer.length > 0) {
@@ -122,6 +121,7 @@
 					this.currentSize = Math.floor(this.recordingDuration / 1000 * this.options.encodeBitRate / 8);
 				}
 			});
+			// #endif
 		},
 		methods: {
 			initRecorderManager() {
@@ -325,50 +325,133 @@
 			
 			async saveRecordingFile(tempFilePath) {
 				try {
+					console.log('开始保存录音文件，临时路径:', tempFilePath);
+					
+					if (!tempFilePath) {
+						throw new Error('录音文件路径无效');
+					}
+
 					// 生成文件名
 					const fileName = `sleep_recording_${new Date().getTime()}.mp3`;
+					console.log('生成的文件名:', fileName);
 					
 					// #ifdef APP-PLUS
-					// 在APP环境下保存到应用私有目录
-					const savePath = plus.io.convertLocalFileSystemURL(`_doc/${fileName}`);
+					// 使用应用沙盒目录
+					const saveDir = plus.io.PUBLIC_DOWNLOADS; // 使用外部存储空间的应用专属目录
+					const savePath = `${saveDir}/${fileName}`;
+					console.log('目标保存路径:', savePath);
+
+					// 确保目录存在
 					await new Promise((resolve, reject) => {
-						plus.io.resolveLocalFileSystemURL(tempFilePath, (entry) => {
-							entry.copyTo(
-								plus.io.convertLocalFileSystemURL('_doc'),
-								fileName,
-								() => {
-									console.log('录音文件保存成功:', savePath);
-									this.lastRecording.savedPath = savePath;
-									resolve();
-								},
-								(error) => {
-									console.error('保存录音文件失败:', error);
-									reject(error);
-								}
-							);
+						plus.io.resolveLocalFileSystemURL(saveDir, (entry) => {
+							console.log('应用专属目录已确认存在');
+							resolve(entry);
+						}, (error) => {
+							console.error('访问应用专属目录失败:', error);
+							reject(new Error('无法访问应用专属目录'));
 						});
 					});
+
+					// 检查源文件是否存在
+					await new Promise((resolve, reject) => {
+						plus.io.resolveLocalFileSystemURL(tempFilePath, (entry) => {
+							console.log('源文件存在，开始复制');
+							resolve(entry);
+						}, (error) => {
+							console.error('源文件不存在:', error);
+							reject(new Error('录音文件不存在'));
+						});
+					});
+
+					// 复制文件到应用专属目录
+					await new Promise((resolve, reject) => {
+						plus.io.resolveLocalFileSystemURL(tempFilePath, (entry) => {
+							console.log('开始复制文件到应用专属目录');
+							entry.copyTo(
+								saveDir,
+								fileName,
+								(newEntry) => {
+									console.log('文件复制成功，新路径:', newEntry.fullPath);
+									this.lastRecording.savedPath = newEntry.fullPath;
+									resolve(newEntry);
+								},
+								(error) => {
+									console.error('文件复制失败:', error);
+									reject(new Error('复制录音文件失败: ' + (error.message || JSON.stringify(error))));
+								}
+							);
+						}, (error) => {
+							console.error('解析源文件路径失败:', error);
+							reject(new Error('无法访问录音文件'));
+						});
+					});
+
+					// 验证文件是否成功保存
+					await new Promise((resolve, reject) => {
+						plus.io.resolveLocalFileSystemURL(savePath, (entry) => {
+							entry.file((file) => {
+								console.log('文件保存验证成功，大小:', file.size);
+								if (file.size > 0) {
+									resolve(file);
+								} else {
+									reject(new Error('保存的文件大小为0'));
+								}
+							}, (error) => {
+								console.error('验证文件失败:', error);
+								reject(new Error('无法验证保存的文件'));
+							});
+						}, (error) => {
+							console.error('验证文件路径失败:', error);
+							reject(new Error('无法访问保存的文件'));
+						});
+					});
+
+					// 保存成功后，将文件信息保存到本地存储
+					try {
+						const recordings = uni.getStorageSync('sleep_recordings') || [];
+						recordings.push({
+							path: savePath,
+							fileName: fileName,
+							duration: this.lastRecording.duration,
+							size: this.lastRecording.size,
+							timestamp: this.lastRecording.timestamp
+						});
+						uni.setStorageSync('sleep_recordings', recordings);
+						console.log('录音信息已保存到本地存储');
+					} catch (storageError) {
+						console.error('保存录音信息到本地存储失败:', storageError);
+					}
 					// #endif
 					
 					// #ifdef H5
-					// H5环境下直接使用Blob URL
-					this.lastRecording.savedPath = tempFilePath;
-					// 可以在这里添加下载功能
-					const link = document.createElement('a');
-					link.href = tempFilePath;
-					link.download = fileName;
-					link.click();
+					// H5环境下的处理保持不变
+					if (tempFilePath.startsWith('blob:')) {
+						this.lastRecording.savedPath = tempFilePath;
+						const link = document.createElement('a');
+						link.href = tempFilePath;
+						link.download = fileName;
+						document.body.appendChild(link);
+						link.click();
+						document.body.removeChild(link);
+						console.log('H5环境文件下载已触发');
+					} else {
+						throw new Error('H5环境下的录音文件格式无效');
+					}
 					// #endif
 					
 					uni.showToast({
 						title: '录音已保存',
-						icon: 'success'
+						icon: 'success',
+						duration: 2000
 					});
+					
+					console.log('录音保存流程完成');
 				} catch (error) {
 					console.error('保存录音文件失败:', error);
-					uni.showToast({
-						title: '保存录音失败',
-						icon: 'none'
+					uni.showModal({
+						title: '保存失败',
+						content: `录音保存失败: ${error.message || '未知错误'}\n请检查存储权限和空间`,
+						showCancel: false
 					});
 				}
 			},
@@ -428,16 +511,14 @@
 </script>
 
 <style>
-	.recorder-container {
-		padding: 0;
-	}
-	
 	.recorder-card {
 		background: #ffffff;
 		border-radius: 24rpx;
 		padding: 30rpx;
 		box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.08);
 		transition: all 0.3s ease;
+		width: 100%;
+		box-sizing: border-box;
 	}
 	
 	.recorder-card.dark-theme {
